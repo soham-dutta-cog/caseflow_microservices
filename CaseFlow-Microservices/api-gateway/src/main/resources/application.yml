@@ -1,0 +1,62 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: iam
+          uri: lb://iam-service
+          predicates:
+            - Path=/api/auth/**
+        - id: iam-2
+          uri: lb://iam-service
+          predicates:
+            - Path=/api/users/**
+        - id: case
+          uri: lb://case-service
+          predicates:
+            - Path=/api/cases/**
+        - id: hearing
+          uri: lb://hearing-service
+          predicates:
+            - Path=/api/hearings/**
+        - id: workflow
+          uri: lb://workflow-service
+          predicates:
+            - Path=/api/workflow/**
+        - id: appeal
+          uri: lb://appeal-service
+          predicates:
+            - Path=/api/appeals/**
+        - id: compliance
+          uri: lb://compliance-service
+          predicates:
+            - Path=/api/compliance/**
+        - id: compliance-2
+          uri: lb://compliance-service
+          predicates:
+            - Path=/api/audits/**
+        - id: notification
+          uri: lb://notification-service
+          predicates:
+            - Path=/api/notifications/**
+        - id: reporting
+          uri: lb://reporting-service
+          predicates:
+            - Path=/api/reports/**
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
