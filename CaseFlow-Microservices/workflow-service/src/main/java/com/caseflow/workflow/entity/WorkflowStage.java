@@ -14,14 +14,4 @@ public class WorkflowStage {
     @Column(nullable = false) private LocalDateTime startedAt;
     private LocalDateTime completedAt;
     @Column(nullable = false) private Boolean active;
-
-    // skip tracking
-    @Column(nullable = false) @Builder.Default
-    private Boolean skipped = false;
-
-    @Column(columnDefinition = "TEXT")
-    private String skipReason;
-
-    // stores the previous role when reassigned (audit trail)
-    private String previousRole;
 }

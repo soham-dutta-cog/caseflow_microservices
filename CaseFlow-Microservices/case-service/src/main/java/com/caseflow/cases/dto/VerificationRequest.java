@@ -7,5 +7,5 @@ import lombok.Data;
 public class VerificationRequest {
     @NotNull private Document.VerificationStatus status;
     private String rejectionReason;
-    @NotNull private Long clerkId;
+    @NotNull private String clerkId;
 }

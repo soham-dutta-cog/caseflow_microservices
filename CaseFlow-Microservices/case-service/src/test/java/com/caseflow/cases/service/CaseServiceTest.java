@@ -37,9 +37,9 @@ class CaseServiceTest {
     }
 
     @Test void fileCase_litigantNotFound_throws() {
-        when(iamClient.existsById(99L)).thenReturn(false);
+        when(iamClient.existsById("99")).thenReturn(false);
         CaseRequest req = new CaseRequest();
-        req.setTitle("Test"); req.setLitigantId(99L);
+        req.setTitle("Test"); req.setLitigantId("99");
         assertThrows(ResourceNotFoundException.class, () -> caseService.fileCase(req));
     }
 

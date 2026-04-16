@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
+import jakarta.transaction.Transactional;
+
 import java.util.*;
 
 @Service @RequiredArgsConstructor @Slf4j
@@ -32,61 +34,123 @@ public class CaseService {
         return mapToCaseResponse(saved);
     }
 
+    @Transactional
     public DocumentResponse uploadDocument(DocumentRequest request) {
         Case existingCase = caseRepository.findById(request.getCaseId())
             .orElseThrow(() -> new ResourceNotFoundException("Case not found: " + request.getCaseId()));
         if (existingCase.getStatus() == Case.CaseStatus.CLOSED)
             throw new InvalidOperationException("Cannot upload documents to a CLOSED case");
-        Document doc = Document.builder().caseId(request.getCaseId()).title(request.getTitle())
+        Document document = Document.builder().caseId(request.getCaseId()).title(request.getTitle())
             .type(request.getType()).uri(request.getUri()).uploadedDate(LocalDateTime.now())
-            .verificationStatus(Document.VerificationStatus.PENDING).uploadedBy(request.getUploadedBy()).build();
-        return mapToDocumentResponse(documentRepository.save(doc));
-    }
+            .verificationStatus(Document.VerificationStatus.PENDING).uploadedBy(request.getUploadedBy())
+                .fileLocalPath(request.getFileLocalPath())
+                .originalFileName(request.getOriginalFileName())
+                .contentType(request.getContentType()).build();
+        Document saved = documentRepository.save(document);
+        String fileUrl = com.caseflow.cases.util.FileStorageUtil.generateFileUrl(saved.getDocumentId());
+        saved.setFileUrl(fileUrl);
+        documentRepository.save(saved);
 
-    public DocumentResponse verifyDocument(Long documentId, VerificationRequest request) {
-        Document doc = documentRepository.findById(documentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
-        if (request.getStatus() == Document.VerificationStatus.REJECTED
-                && (request.getRejectionReason() == null || request.getRejectionReason().isBlank()))
-            throw new InvalidOperationException("Rejection reason is required");
-        doc.setVerificationStatus(request.getStatus());
-        doc.setRejectionReason(request.getStatus() == Document.VerificationStatus.REJECTED
-            ? request.getRejectionReason() : null);
-        Document saved = documentRepository.save(doc);
-        checkAndActivateCase(doc.getCaseId());
+
+        sendNotification(request.getUploadedBy(), request.getCaseId(),
+                "Document '" + saved.getTitle() + "' uploaded for Case #" + request.getCaseId() + ". Pending verification.",
+                "CASE");
         return mapToDocumentResponse(saved);
     }
 
+    public DocumentResponse verifyDocument(Long documentId, VerificationRequest request) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+        if (request.getStatus() == Document.VerificationStatus.REJECTED
+                && (request.getRejectionReason() == null || request.getRejectionReason().isBlank()))
+            throw new InvalidOperationException("Rejection reason is required when rejecting a document");
+        document.setVerificationStatus(request.getStatus());
+        document.setRejectionReason(request.getStatus() == Document.VerificationStatus.REJECTED
+                ? request.getRejectionReason() : null);
+        Document saved = documentRepository.save(document);
+
+        String action = request.getStatus() == Document.VerificationStatus.VERIFIED
+                ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED";
+        log.info("Document {} {} by clerk {}", documentId, action, request.getClerkId());
+
+        Case relatedCase = caseRepository.findById(document.getCaseId()).orElse(null);
+        if (relatedCase != null) {
+            String msg = request.getStatus() == Document.VerificationStatus.VERIFIED
+                    ? "Document '" + saved.getTitle() + "' for Case #" + document.getCaseId() + " has been VERIFIED."
+                    : "Document '" + saved.getTitle() + "' for Case #" + document.getCaseId()
+                    + " has been REJECTED. Reason: " + request.getRejectionReason();
+
+            sendNotification(relatedCase.getLitigantId(), document.getCaseId(), msg, "CASE");
+            if (relatedCase.getLawyerId() != null) {
+                sendNotification(relatedCase.getLawyerId(), document.getCaseId(), msg, "CASE");
+            }
+        }
+        checkAndActivateCase(document.getCaseId());
+        return mapToDocumentResponse(saved);
+    }
+
+    public byte[] downloadDocument(Long documentId) {
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+
+        if (document.getFileLocalPath() == null || document.getFileLocalPath().isEmpty()) {
+            throw new InvalidOperationException("No file found for document: " + documentId);
+        }
+
+        try {
+            return com.caseflow.cases.util.FileStorageUtil.readFile(document.getFileLocalPath());
+        } catch (Exception e) {
+            log.error("Error reading file: {}", e.getMessage());
+            throw new InvalidOperationException("Error retrieving file: " + e.getMessage());
+        }
+    }
+
     private void checkAndActivateCase(Long caseId) {
-        long total = documentRepository.countByCaseId(caseId);
-        long verified = documentRepository.countByCaseIdAndVerificationStatus(caseId, Document.VerificationStatus.VERIFIED);
-        if (total > 0 && total == verified) {
-            Case c = caseRepository.findById(caseId).orElseThrow(() -> new ResourceNotFoundException("Case not found"));
-            if (c.getStatus() == Case.CaseStatus.FILED) {
-                c.setStatus(Case.CaseStatus.ACTIVE);
-                caseRepository.save(c);
-                try { workflowClient.advanceWorkflow(caseId); } catch (Exception e) {
-                    log.warn("Failed to advance workflow for case {}: {}", caseId, e.getMessage());
+        long totalDocs = documentRepository.countByCaseId(caseId);
+        long verifiedDocs = documentRepository.countByCaseIdAndVerificationStatus(caseId, Document.VerificationStatus.VERIFIED);
+        if (totalDocs > 0 && totalDocs == verifiedDocs) {
+            Case existingCase = caseRepository.findById(caseId).orElseThrow(() -> new ResourceNotFoundException("Case not found"));
+            if (existingCase.getStatus() == Case.CaseStatus.FILED) {
+                existingCase.setStatus(Case.CaseStatus.ACTIVE);
+                caseRepository.save(existingCase);
+                String msg = "Case #" + caseId + " is now ACTIVE. All documents have been verified.";
+                sendNotification(existingCase.getLitigantId(), caseId, msg, "CASE");
+                if (existingCase.getLawyerId() != null) {
+                    sendNotification(existingCase.getLawyerId(), caseId, msg, "CASE");
                 }
+
+                log.info("Case {} activated — advancing workflow", caseId);
+                workflowClient.advanceWorkflow(caseId);
             }
         }
     }
 
-    public CaseResponse updateCaseStatus(Long caseId, Case.CaseStatus newStatus) {
-        Case c = caseRepository.findById(caseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Case not found: " + caseId));
-        c.setStatus(newStatus);
-        return mapToCaseResponse(caseRepository.save(c));
-    }
+    public CaseResponse updateCaseStatus(Long caseId, Case.CaseStatus newStatus, String updatedBy) {
+        Case existingCase = caseRepository.findById(caseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Case not found: " + caseId));
+        Case.CaseStatus oldStatus = existingCase.getStatus();
+        existingCase.setStatus(newStatus);
+        Case saved = caseRepository.save(existingCase);
 
+        log.info("Case {} status updated from {} to {} by user {}", caseId, oldStatus, newStatus, updatedBy);
+
+        if (newStatus == Case.CaseStatus.CLOSED) {
+            String msg = "Case #" + caseId + " has been CLOSED.";
+            sendNotification(saved.getLitigantId(), caseId, msg, "CASE");
+            if (saved.getLawyerId() != null) {
+                sendNotification(saved.getLawyerId(), caseId, msg, "CASE");
+            }
+        }
+        return mapToCaseResponse(saved);
+    }
     public CaseResponse getCaseById(Long caseId) {
         return mapToCaseResponse(caseRepository.findById(caseId)
-            .orElseThrow(() -> new ResourceNotFoundException("Case not found: " + caseId)));
+                .orElseThrow(() -> new ResourceNotFoundException("Case not found: " + caseId)));
     }
 
     public List<CaseResponse> getAllCases() { return caseRepository.findAll().stream().map(this::mapToCaseResponse).toList(); }
-    public List<CaseResponse> getCasesByLitigant(Long id) { return caseRepository.findByLitigantId(id).stream().map(this::mapToCaseResponse).toList(); }
-    public List<CaseResponse> getCasesByLawyer(Long id) { return caseRepository.findByLawyerId(id).stream().map(this::mapToCaseResponse).toList(); }
+    public List<CaseResponse> getCasesByLitigant(String id) { return caseRepository.findByLitigantId(id).stream().map(this::mapToCaseResponse).toList(); }
+    public List<CaseResponse> getCasesByLawyer(String id) { return caseRepository.findByLawyerId(id).stream().map(this::mapToCaseResponse).toList(); }
     public List<CaseResponse> getCasesByStatus(Case.CaseStatus s) { return caseRepository.findByStatus(s).stream().map(this::mapToCaseResponse).toList(); }
     public List<DocumentResponse> getDocumentsByCaseId(Long id) { return documentRepository.findByCaseId(id).stream().map(this::mapToDocumentResponse).toList(); }
     public List<DocumentResponse> getPendingDocuments() { return documentRepository.findByVerificationStatus(Document.VerificationStatus.PENDING).stream().map(this::mapToDocumentResponse).toList(); }
@@ -99,7 +163,7 @@ public class CaseService {
         caseRepository.save(c);
     }
 
-    private void sendNotification(Long userId, Long caseId, String message, String category) {
+    private void sendNotification(String userId, Long caseId, String message, String category) {
         try {
             Map<String, Object> req = new HashMap<>();
             req.put("userId", userId); req.put("caseId", caseId);
@@ -123,6 +187,9 @@ public class CaseService {
         res.setUri(d.getUri()); res.setUploadedDate(d.getUploadedDate());
         res.setVerificationStatus(d.getVerificationStatus());
         res.setUploadedBy(d.getUploadedBy()); res.setRejectionReason(d.getRejectionReason());
+        res.setFileUrl(d.getFileUrl());
+        res.setOriginalFileName(d.getOriginalFileName());
+        res.setContentType(d.getContentType());
         return res;
     }
 }

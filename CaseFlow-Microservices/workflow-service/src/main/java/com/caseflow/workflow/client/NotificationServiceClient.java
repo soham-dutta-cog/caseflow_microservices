@@ -1,11 +1,9 @@
 package com.caseflow.workflow.client;
-
-import com.caseflow.workflow.client.fallback.NotificationServiceFallback;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
-@FeignClient(name = "notification-service", fallback = NotificationServiceFallback.class)
+@FeignClient(name = "notification-service")
 public interface NotificationServiceClient {
     @PostMapping("/api/notifications/internal")
     void sendNotification(@RequestBody Map<String, Object> request);

@@ -22,8 +22,6 @@ public class WorkflowService {
     private final CaseServiceClient caseClient;
     private final NotificationServiceClient notificationClient;
 
-    // ===================== LIFECYCLE INIT =====================
-
     @Transactional
     public void initLifecycle(Long caseId, String mode, String caseType, List<ManualStageRequest> manualStages) {
         try { caseClient.setCaseType(caseId, caseType); } catch (Exception e) {
@@ -40,10 +38,6 @@ public class WorkflowService {
             else stages = StageTemplate.getCivilStage();
             initFromTemplate(caseId, stages);
         }
-
-        sendNotification(1L, caseId, "Workflow lifecycle initialized for Case #" + caseId
-                + " (Type: " + caseType + ", Mode: " + mode + ")", "CASE");
-
         log.info("Lifecycle initialized for Case: {} Mode: {} Type: {}", caseId, mode, caseType);
     }
 
@@ -53,7 +47,7 @@ public class WorkflowService {
             toSave.add(WorkflowStage.builder().caseId(caseId).sequenceNumber(stg.getSeqNum())
                 .roleResponsible(stg.getRole().toUpperCase()).slaDays(stg.getSlaDays())
                 .stageName(stg.getStageName()).startedAt(LocalDateTime.now())
-                .active(stg.getSeqNum() == 1).skipped(false).build());
+                .active(stg.getSeqNum() == 1).build());
         }
         workflowStageRepository.saveAll(toSave);
         workflowStageRepository.flush();
@@ -61,7 +55,7 @@ public class WorkflowService {
             .orElseThrow(() -> new ResourceNotFoundException("First stage not found after save"));
         slaRecordRepository.save(SLARecord.builder().caseId(caseId).stageId(first.getStageId())
             .startDate(LocalDate.now()).status(SLARecord.SLAStatus.ON_TIME)
-            .slaDays(first.getSlaDays()).breachNotified(false).warningNotified(false).build());
+            .slaDays(first.getSlaDays()).breachNotified(false).build());
     }
 
     private void initManualStages(Long caseId, List<ManualStageRequest> manualStages) {
@@ -74,7 +68,7 @@ public class WorkflowService {
             toSave.add(WorkflowStage.builder().caseId(caseId).sequenceNumber(m.getSequenceNumber())
                 .roleResponsible(m.getRoleResponsible().toUpperCase()).slaDays(m.getSlaDays())
                 .stageName(m.getStageName()).startedAt(LocalDateTime.now())
-                .active(m.getSequenceNumber() == 1).skipped(false).build());
+                .active(m.getSequenceNumber() == 1).build());
         }
         toSave.sort(Comparator.comparingInt(WorkflowStage::getSequenceNumber));
         workflowStageRepository.saveAll(toSave);
@@ -83,352 +77,60 @@ public class WorkflowService {
             .orElseThrow(() -> new ResourceNotFoundException("First stage not found after save"));
         slaRecordRepository.save(SLARecord.builder().caseId(caseId).stageId(first.getStageId())
             .startDate(LocalDate.now()).status(SLARecord.SLAStatus.ON_TIME)
-            .slaDays(first.getSlaDays()).breachNotified(false).warningNotified(false).build());
+            .slaDays(first.getSlaDays()).breachNotified(false).build());
     }
-
-    // ===================== ADVANCE WORKFLOW =====================
 
     public void advanceWorkflow(Long caseId) {
         WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId).orElse(null);
         if (current == null) { log.warn("No active workflow stage found for case: {}", caseId); return; }
-
-        current.setActive(false);
-        current.setCompletedAt(LocalDateTime.now());
+        current.setActive(false); current.setCompletedAt(LocalDateTime.now());
         workflowStageRepository.save(current);
-
-        closeSLAForStage(current.getStageId());
-
+        SLARecord currentSla = slaRecordRepository.findByStageId(current.getStageId()).orElse(null);
+        if (currentSla != null) {
+            currentSla.setEndDate(LocalDate.now());
+            long elapsed = ChronoUnit.DAYS.between(currentSla.getStartDate(), LocalDate.now());
+            if (currentSla.getStatus() != SLARecord.SLAStatus.BREACHED)
+                currentSla.setStatus(elapsed <= currentSla.getSlaDays() ? SLARecord.SLAStatus.ON_TIME : SLARecord.SLAStatus.BREACHED);
+            slaRecordRepository.save(currentSla);
+        }
         int nextSeq = current.getSequenceNumber() + 1;
         Optional<WorkflowStage> next = workflowStageRepository.findByCaseIdAndSequenceNumber(caseId, nextSeq);
         if (next.isPresent()) {
-            activateStage(next.get());
-            sendNotification(1L, caseId, "Case #" + caseId + " advanced to Stage "
-                    + nextSeq + ": " + next.get().getStageName(), "CASE");
-        } else {
-            sendNotification(1L, caseId, "Workflow completed for Case #" + caseId
-                    + ". All stages finished.", "CASE");
-            log.info("Workflow completed for Case: {}", caseId);
-        }
+            WorkflowStage n = next.get();
+            n.setActive(true); n.setStartedAt(LocalDateTime.now());
+            workflowStageRepository.save(n);
+            slaRecordRepository.save(SLARecord.builder().caseId(caseId).stageId(n.getStageId())
+                .startDate(LocalDate.now()).status(SLARecord.SLAStatus.ON_TIME)
+                .slaDays(n.getSlaDays()).breachNotified(false).build());
+        } else { log.info("Workflow completed for Case: {}", caseId); }
         log.info("Workflow advanced for Case: {} -> Stage {}", caseId, nextSeq);
     }
 
-    // ===================== FEATURE 1: SLA EARLY WARNING (80%) =====================
-
     public String runManualSLACheck() {
-        List<SLARecord> active = slaRecordRepository.findAll().stream()
-                .filter(s -> s.getEndDate() == null).toList();
+        List<SLARecord> active = slaRecordRepository.findAll().stream().filter(s -> s.getEndDate() == null).toList();
         int breachCount = 0;
-        int warningCount = 0;
-
         for (SLARecord sla : active) {
             long elapsed = ChronoUnit.DAYS.between(sla.getStartDate(), LocalDate.now());
-            double usagePercent = (double) elapsed / sla.getSlaDays() * 100;
-
-            // 80% early warning check
-            if (usagePercent >= 80 && usagePercent < 100
-                    && !Boolean.TRUE.equals(sla.getWarningNotified())
-                    && sla.getStatus() != SLARecord.SLAStatus.BREACHED) {
-                sla.setStatus(SLARecord.SLAStatus.WARNING);
-                sla.setWarningNotified(true);
-                slaRecordRepository.save(sla);
-
-                sendNotification(1L, sla.getCaseId(),
-                        "SLA WARNING: Case #" + sla.getCaseId() + " Stage #" + sla.getStageId()
-                        + " has consumed " + Math.round(usagePercent) + "% of SLA ("
-                        + elapsed + "/" + sla.getSlaDays() + " days). Action needed soon!",
-                        "CASE");
-
-                log.warn("SLA WARNING — Case: {} Stage: {} Usage: {}%",
-                        sla.getCaseId(), sla.getStageId(), Math.round(usagePercent));
-                warningCount++;
-            }
-
-            // breach check
             if (elapsed > sla.getSlaDays() && sla.getStatus() != SLARecord.SLAStatus.BREACHED) {
                 sla.setStatus(SLARecord.SLAStatus.BREACHED);
                 sla.setBreachNotified(true);
                 slaRecordRepository.save(sla);
-
-                sendNotification(1L, sla.getCaseId(),
-                        "SLA BREACHED: Case #" + sla.getCaseId() + " Stage #" + sla.getStageId()
-                        + " exceeded SLA by " + (elapsed - sla.getSlaDays()) + " day(s).",
-                        "CASE");
-
                 breachCount++;
             }
         }
-        return "SLA check completed. Warnings: " + warningCount
-                + ", Breaches: " + breachCount + " out of " + active.size() + " active records.";
+        return "SLA check completed. Breaches found: " + breachCount + " out of " + active.size() + " active records.";
     }
-
-    // ===================== FEATURE 2: ROLLBACK WORKFLOW =====================
-
-    @Transactional
-    public WorkflowStageResponse rollbackWorkflow(Long caseId) {
-        WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
-                .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId));
-
-        if (current.getSequenceNumber() <= 1) {
-            throw new InvalidOperationException("Cannot rollback — already at the first stage");
-        }
-
-        // deactivate current stage, reset its timestamps
-        current.setActive(false);
-        current.setStartedAt(LocalDateTime.now()); // reset so it's fresh when re-entered later
-        current.setCompletedAt(null);
-        workflowStageRepository.save(current);
-
-        // close current SLA as ROLLED_BACK
-        closeSLAForStage(current.getStageId(), SLARecord.SLAStatus.ROLLED_BACK);
-
-        // find previous stage (skip over any skipped stages)
-        int prevSeq = current.getSequenceNumber() - 1;
-        WorkflowStage previous = null;
-        while (prevSeq >= 1) {
-            Optional<WorkflowStage> opt = workflowStageRepository.findByCaseIdAndSequenceNumber(caseId, prevSeq);
-            if (opt.isPresent() && !Boolean.TRUE.equals(opt.get().getSkipped())) {
-                previous = opt.get();
-                break;
-            }
-            prevSeq--;
-        }
-
-        if (previous == null) {
-            throw new InvalidOperationException("No non-skipped previous stage available to rollback to");
-        }
-
-        // re-activate previous stage
-        previous.setActive(true);
-        previous.setCompletedAt(null);
-        previous.setStartedAt(LocalDateTime.now());
-        workflowStageRepository.save(previous);
-
-        // create fresh SLA for the rolled-back stage
-        slaRecordRepository.save(SLARecord.builder().caseId(caseId).stageId(previous.getStageId())
-                .startDate(LocalDate.now()).status(SLARecord.SLAStatus.ON_TIME)
-                .slaDays(previous.getSlaDays()).breachNotified(false).warningNotified(false).build());
-
-        sendNotification(1L, caseId, "Workflow for Case #" + caseId
-                + " rolled back from Stage " + current.getSequenceNumber()
-                + " (" + current.getStageName() + ") to Stage " + previous.getSequenceNumber()
-                + " (" + previous.getStageName() + ")", "CASE");
-
-        log.info("Workflow rolled back for Case: {} from Stage {} to Stage {}",
-                caseId, current.getSequenceNumber(), previous.getSequenceNumber());
-
-        return mapToStageResponse(previous);
-    }
-
-    // ===================== FEATURE 3: SKIP STAGE =====================
-
-    @Transactional
-    public WorkflowStageResponse skipCurrentStage(Long caseId, String reason) {
-        WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
-                .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId));
-
-        // mark as skipped
-        current.setActive(false);
-        current.setSkipped(true);
-        current.setSkipReason(reason);
-        current.setCompletedAt(LocalDateTime.now());
-        workflowStageRepository.save(current);
-
-        // close the SLA for the skipped stage as SKIPPED
-        closeSLAForStage(current.getStageId(), SLARecord.SLAStatus.SKIPPED);
-
-        // find and activate next stage
-        int nextSeq = current.getSequenceNumber() + 1;
-        Optional<WorkflowStage> next = workflowStageRepository.findByCaseIdAndSequenceNumber(caseId, nextSeq);
-
-        if (next.isPresent()) {
-            activateStage(next.get());
-
-            sendNotification(1L, caseId, "Stage " + current.getSequenceNumber()
-                    + " (" + current.getStageName() + ") SKIPPED for Case #" + caseId
-                    + ". Reason: " + reason + ". Moved to Stage " + nextSeq
-                    + " (" + next.get().getStageName() + ")", "CASE");
-
-            log.info("Stage {} skipped for Case: {}, reason: {}", current.getSequenceNumber(), caseId, reason);
-            return mapToStageResponse(next.get());
-        } else {
-            sendNotification(1L, caseId, "Last stage skipped for Case #" + caseId
-                    + ". Workflow completed. Skip reason: " + reason, "CASE");
-            log.info("Last stage skipped, workflow completed for Case: {}", caseId);
-            return mapToStageResponse(current);
-        }
-    }
-
-    // ===================== FEATURE 4: SLA EXTENSION / DEADLINE OVERRIDE =====================
-
-    @Transactional
-    public SLARecordResponse extendSLA(Long caseId, SLAExtensionRequest request) {
-        WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
-                .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId));
-
-        SLARecord sla = slaRecordRepository.findByStageId(current.getStageId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No SLA record found for active stage of case: " + caseId));
-
-        if (sla.getEndDate() != null) {
-            throw new InvalidOperationException("Cannot extend SLA for a completed/closed stage");
-        }
-
-        // store original if this is the first extension
-        if (sla.getOriginalSlaDays() == null) {
-            sla.setOriginalSlaDays(sla.getSlaDays());
-        }
-
-        int oldDays = sla.getSlaDays();
-        sla.setSlaDays(oldDays + request.getAdditionalDays());
-        sla.setExtensionReason(request.getReason());
-
-        // SLA extension only updates the sla_records table, NOT workflow_stages
-
-        // if it was BREACHED or WARNING, re-evaluate status with new deadline
-        long elapsed = ChronoUnit.DAYS.between(sla.getStartDate(), LocalDate.now());
-        if (elapsed <= sla.getSlaDays()) {
-            double usagePercent = (double) elapsed / sla.getSlaDays() * 100;
-            if (usagePercent >= 80) {
-                sla.setStatus(SLARecord.SLAStatus.WARNING);
-            } else {
-                sla.setStatus(SLARecord.SLAStatus.ON_TIME);
-                sla.setWarningNotified(false); // reset warning since we have breathing room
-            }
-            sla.setBreachNotified(false);
-        }
-
-        slaRecordRepository.save(sla);
-
-        sendNotification(1L, caseId, "SLA Extended for Case #" + caseId + " Stage "
-                + current.getSequenceNumber() + " (" + current.getStageName() + "): "
-                + oldDays + " → " + sla.getSlaDays() + " days. Reason: " + request.getReason(),
-                "CASE");
-
-        log.info("SLA extended for Case: {} Stage: {} from {} to {} days. Reason: {}",
-                caseId, current.getStageId(), oldDays, sla.getSlaDays(), request.getReason());
-
-        return mapToSLAResponse(sla);
-    }
-
-    // ===================== FEATURE 5: REASSIGN ROLE =====================
-
-    @Transactional
-    public WorkflowStageResponse reassignRole(Long caseId, ReassignRoleRequest request) {
-        WorkflowStage stage = workflowStageRepository.findById(request.getStageId())
-                .orElseThrow(() -> new ResourceNotFoundException("Stage not found: " + request.getStageId()));
-
-        if (!stage.getCaseId().equals(caseId)) {
-            throw new InvalidOperationException("Stage #" + request.getStageId()
-                    + " does not belong to Case #" + caseId);
-        }
-
-        // can only reassign stages that haven't started yet OR the currently active one
-        if (stage.getCompletedAt() != null || Boolean.TRUE.equals(stage.getSkipped())) {
-            throw new InvalidOperationException("Cannot reassign a completed or skipped stage");
-        }
-
-        String oldRole = stage.getRoleResponsible();
-        String newRole = request.getNewRole().toUpperCase();
-
-        if (oldRole.equals(newRole)) {
-            throw new InvalidOperationException("New role is the same as current role: " + oldRole);
-        }
-
-        stage.setPreviousRole(oldRole);
-        stage.setRoleResponsible(newRole);
-        workflowStageRepository.save(stage);
-
-        sendNotification(1L, caseId, "Role reassigned for Case #" + caseId + " Stage "
-                + stage.getSequenceNumber() + " (" + stage.getStageName() + "): "
-                + oldRole + " → " + newRole, "CASE");
-
-        log.info("Role reassigned for Case: {} Stage: {} from {} to {}",
-                caseId, stage.getStageId(), oldRole, newRole);
-
-        return mapToStageResponse(stage);
-    }
-
-    // ===================== QUERIES =====================
 
     public List<WorkflowStageResponse> getStagesByCaseId(Long caseId) {
-        return workflowStageRepository.findByCaseIdOrderBySequenceNumber(caseId)
-                .stream().map(this::mapToStageResponse).toList();
+        return workflowStageRepository.findByCaseIdOrderBySequenceNumber(caseId).stream().map(this::mapToStageResponse).toList();
     }
-
     public WorkflowStageResponse getCurrentStage(Long caseId) {
         return mapToStageResponse(workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
             .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId)));
     }
-
-    public List<SLARecordResponse> getSLARecordsByCaseId(Long caseId) {
-        return slaRecordRepository.findByCaseId(caseId).stream().map(this::mapToSLAResponse).toList();
-    }
-
-    public List<SLARecordResponse> getAllBreachedSLAs() {
-        return slaRecordRepository.findByStatus(SLARecord.SLAStatus.BREACHED)
-                .stream().map(this::mapToSLAResponse).toList();
-    }
-
-    public List<SLARecordResponse> getAllWarningSLAs() {
-        return slaRecordRepository.findByStatus(SLARecord.SLAStatus.WARNING)
-                .stream().map(this::mapToSLAResponse).toList();
-    }
-
-    public List<SLARecordResponse> getAllActiveSLAs() {
-        return slaRecordRepository.findAll().stream()
-                .filter(s -> s.getEndDate() == null).map(this::mapToSLAResponse).toList();
-    }
-
-    // ===================== INTERNAL HELPERS =====================
-
-    private void closeSLAForStage(Long stageId) {
-        closeSLAForStage(stageId, null);
-    }
-
-    private void closeSLAForStage(Long stageId, SLARecord.SLAStatus overrideStatus) {
-        SLARecord sla = slaRecordRepository.findByStageId(stageId).orElse(null);
-        if (sla != null && sla.getEndDate() == null) {
-            sla.setEndDate(LocalDate.now());
-            if (overrideStatus != null) {
-                sla.setStatus(overrideStatus);
-            } else {
-                long elapsed = ChronoUnit.DAYS.between(sla.getStartDate(), LocalDate.now());
-                if (sla.getStatus() != SLARecord.SLAStatus.BREACHED) {
-                    sla.setStatus(elapsed <= sla.getSlaDays()
-                            ? SLARecord.SLAStatus.COMPLETED : SLARecord.SLAStatus.BREACHED);
-                }
-            }
-            slaRecordRepository.save(sla);
-        }
-    }
-
-    private void activateStage(WorkflowStage stage) {
-        stage.setActive(true);
-        stage.setStartedAt(LocalDateTime.now());
-        stage.setCompletedAt(null);
-        workflowStageRepository.save(stage);
-
-        slaRecordRepository.save(SLARecord.builder()
-                .caseId(stage.getCaseId()).stageId(stage.getStageId())
-                .startDate(LocalDate.now()).status(SLARecord.SLAStatus.ON_TIME)
-                .slaDays(stage.getSlaDays()).breachNotified(false)
-                .warningNotified(false).build());
-    }
-
-    private void sendNotification(Long userId, Long caseId, String message, String category) {
-        try {
-            Map<String, Object> req = new HashMap<>();
-            req.put("userId", userId);
-            req.put("caseId", caseId);
-            req.put("message", message);
-            req.put("category", category);
-            notificationClient.sendNotification(req);
-        } catch (Exception e) {
-            log.warn("Notification failed for Case {}: {}", caseId, e.getMessage());
-        }
-    }
-
-    // ===================== MAPPERS =====================
+    public List<SLARecordResponse> getSLARecordsByCaseId(Long caseId) { return slaRecordRepository.findByCaseId(caseId).stream().map(this::mapToSLAResponse).toList(); }
+    public List<SLARecordResponse> getAllBreachedSLAs() { return slaRecordRepository.findByStatus(SLARecord.SLAStatus.BREACHED).stream().map(this::mapToSLAResponse).toList(); }
+    public List<SLARecordResponse> getAllActiveSLAs() { return slaRecordRepository.findAll().stream().filter(s -> s.getEndDate() == null).map(this::mapToSLAResponse).toList(); }
 
     private WorkflowStageResponse mapToStageResponse(WorkflowStage s) {
         WorkflowStageResponse r = new WorkflowStageResponse();
@@ -436,25 +138,17 @@ public class WorkflowService {
         r.setSequenceNumber(s.getSequenceNumber()); r.setRoleResponsible(s.getRoleResponsible());
         r.setSlaDays(s.getSlaDays()); r.setStageName(s.getStageName());
         r.setStartedAt(s.getStartedAt()); r.setCompletedAt(s.getCompletedAt());
-        r.setActive(s.getActive()); r.setSkipped(s.getSkipped());
-        r.setSkipReason(s.getSkipReason()); r.setPreviousRole(s.getPreviousRole());
-        return r;
+        r.setActive(s.getActive()); return r;
     }
-
     private SLARecordResponse mapToSLAResponse(SLARecord s) {
         SLARecordResponse r = new SLARecordResponse();
         r.setSlaRecordId(s.getSlaRecordId()); r.setCaseId(s.getCaseId());
         r.setStageId(s.getStageId()); r.setStartDate(s.getStartDate());
         r.setEndDate(s.getEndDate()); r.setStatus(s.getStatus());
         r.setSlaDays(s.getSlaDays()); r.setBreachNotified(s.getBreachNotified());
-        r.setWarningNotified(s.getWarningNotified());
-        r.setOriginalSlaDays(s.getOriginalSlaDays());
-        r.setExtensionReason(s.getExtensionReason());
         LocalDate end = s.getEndDate() != null ? s.getEndDate() : LocalDate.now();
         long elapsed = ChronoUnit.DAYS.between(s.getStartDate(), end);
-        r.setDaysElapsed(elapsed);
-        r.setDaysRemaining(s.getSlaDays() - elapsed);
-        r.setSlaUsagePercent(s.getSlaDays() > 0 ? Math.round((double) elapsed / s.getSlaDays() * 10000.0) / 100.0 : 0.0);
+        r.setDaysElapsed(elapsed); r.setDaysRemaining(s.getSlaDays() - elapsed);
         return r;
     }
 }

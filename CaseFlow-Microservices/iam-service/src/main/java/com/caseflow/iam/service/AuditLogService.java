@@ -7,16 +7,28 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Service @RequiredArgsConstructor
+@Service
+@RequiredArgsConstructor
 public class AuditLogService {
+
     private final AuditLogRepository auditLogRepository;
 
-    public void log(Long userId, String action, String resource) {
-        auditLogRepository.save(AuditLog.builder()
-            .userId(userId).action(action).resource(resource)
-            .timestamp(LocalDateTime.now()).build());
+    public void log(String userId, String action, String resource) {
+        AuditLog log = AuditLog.builder()
+                .userId(userId)
+                .action(action)
+                .resource(resource)
+                .timestamp(LocalDateTime.now())
+                .build();
+        auditLogRepository.save(log);
     }
 
-    public List<AuditLog> getLogsByUser(Long userId) { return auditLogRepository.findByUserId(userId); }
-    public List<AuditLog> getAllLogs() { return auditLogRepository.findAll(); }
+    public List<AuditLog> getLogsByUser(String userId) {
+        return auditLogRepository.findByUserId(userId);
+    }
+
+    public List<AuditLog> getAllLogs() {
+        return auditLogRepository.findAll();
+    }
 }
+

@@ -24,7 +24,6 @@
 
     <modules>
         <module>eureka-server</module>
-        <module>config-server</module>
         <module>api-gateway</module>
         <module>iam-service</module>
         <module>case-service</module>

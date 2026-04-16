@@ -9,8 +9,4 @@ public class SLARecordResponse {
     private LocalDate startDate; private LocalDate endDate;
     private SLARecord.SLAStatus status; private Integer slaDays;
     private Boolean breachNotified; private Long daysElapsed; private Long daysRemaining;
-    private Boolean warningNotified; private Integer originalSlaDays;
-    private String extensionReason;
-    // calculated percentage — how much of SLA is consumed
-    private Double slaUsagePercent;
 }

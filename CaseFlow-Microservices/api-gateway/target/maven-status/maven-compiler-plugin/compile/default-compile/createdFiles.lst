@@ -1,0 +1,5 @@
+com\caseflow\gateway\security\RouteValidator.class
+com\caseflow\gateway\ApiGatewayApplication.class
+com\caseflow\gateway\security\AuthenticationFilter$Config.class
+com\caseflow\gateway\security\JwtUtil.class
+com\caseflow\gateway\security\AuthenticationFilter.class
