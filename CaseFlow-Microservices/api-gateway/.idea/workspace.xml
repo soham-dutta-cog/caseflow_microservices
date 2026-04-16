@@ -10,6 +10,11 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_C:/Users/2479691/Desktop/caseflow/CaseFlow-Microservices/CaseFlow-Microservices/api-gateway" value="3C3eqsLHjJtMJ7v8ZxF2j8urofj" />
+    </persistenceIdMap>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
   </component>
@@ -40,7 +45,8 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/2479691/Desktop/caseflow/CaseFlow-Microservices/CaseFlow-Microservices/api-gateway&quot;
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/2479691/Desktop/caseflow/CaseFlow-Microservices/CaseFlow-Microservices/api-gateway&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;project.propVCSSupport.DirectoryMappings&quot;
   }
 }</component>
   <component name="TaskManager">
@@ -52,6 +58,11 @@
       <updated>1775618874501</updated>
     </task>
     <servers />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <ignored-roots>
+      <path value="$PROJECT_DIR$/../.." />
+    </ignored-roots>
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>
