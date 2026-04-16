@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: notification-service
+  config:
+    import: optional:configserver:http://localhost:8888
   datasource:
     url: jdbc:mysql://localhost:3306/caseflow_notification_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
     username: root

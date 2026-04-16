@@ -1,0 +1,216 @@
+/* ===== CASEFLOW DESIGN SYSTEM ===== */
+/* All team members: import this file and use these variables for consistency */
+
+:root {
+  /* Primary palette — deep navy & warm gold */
+  --cf-navy-950: #0a0e1a;
+  --cf-navy-900: #0f1629;
+  --cf-navy-800: #1a2340;
+  --cf-navy-700: #253157;
+  --cf-navy-600: #34436e;
+  --cf-navy-500: #4a5d8a;
+  --cf-navy-400: #6b7faa;
+  --cf-navy-300: #94a5c5;
+  --cf-navy-200: #bdc8de;
+  --cf-navy-100: #e1e6f0;
+  --cf-navy-50: #f0f2f7;
+
+  --cf-gold-500: #c9a84c;
+  --cf-gold-400: #d4b865;
+  --cf-gold-300: #e0c97f;
+  --cf-gold-200: #ebdaa0;
+  --cf-gold-100: #f5ecc8;
+
+  /* Accent colors for modules */
+  --cf-teal: #2dd4a8;
+  --cf-teal-dark: #1a9e7e;
+  --cf-coral: #f07068;
+  --cf-blue: #4a90d9;
+  --cf-violet: #8b6cc1;
+  --cf-amber: #e8a838;
+
+  /* Neutrals */
+  --cf-white: #ffffff;
+  --cf-gray-50: #f8f9fa;
+  --cf-gray-100: #f1f3f5;
+  --cf-gray-200: #e9ecef;
+  --cf-gray-300: #dee2e6;
+  --cf-gray-400: #adb5bd;
+  --cf-gray-500: #868e96;
+  --cf-gray-600: #6c757d;
+  --cf-gray-700: #495057;
+  --cf-gray-800: #343a40;
+  --cf-gray-900: #212529;
+
+  /* Typography */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+  --space-4xl: 96px;
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(10, 14, 26, 0.08);
+  --shadow-md: 0 4px 12px rgba(10, 14, 26, 0.1);
+  --shadow-lg: 0 12px 32px rgba(10, 14, 26, 0.12);
+  --shadow-xl: 0 20px 60px rgba(10, 14, 26, 0.16);
+  --shadow-glow: 0 0 40px rgba(201, 168, 76, 0.15);
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+}
+
+/* ===== RESET & BASE ===== */
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--cf-gray-900);
+  background: var(--cf-white);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* ===== UTILITY CLASSES (for team use) ===== */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-lg);
+}
+
+.section {
+  padding: var(--space-4xl) 0;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--cf-gold-500), var(--cf-gold-300));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ===== BUTTON SYSTEM ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 12px 28px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--cf-gold-500), var(--cf-gold-400));
+  color: var(--cf-navy-950);
+  box-shadow: 0 2px 12px rgba(201, 168, 76, 0.3);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(201, 168, 76, 0.4);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--cf-white);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+}
+.btn-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-dark {
+  background: var(--cf-navy-900);
+  color: var(--cf-white);
+}
+.btn-dark:hover {
+  background: var(--cf-navy-800);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-in {
+  animation: fadeInUp 0.7s var(--ease-out) forwards;
+  opacity: 0;
+}
+
+.animate-in-delay-1 { animation-delay: 0.1s; }
+.animate-in-delay-2 { animation-delay: 0.2s; }
+.animate-in-delay-3 { animation-delay: 0.3s; }
+.animate-in-delay-4 { animation-delay: 0.4s; }
+.animate-in-delay-5 { animation-delay: 0.5s; }
+.animate-in-delay-6 { animation-delay: 0.6s; }

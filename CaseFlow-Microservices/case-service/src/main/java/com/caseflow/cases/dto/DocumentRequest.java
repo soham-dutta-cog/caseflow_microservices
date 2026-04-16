@@ -5,9 +5,17 @@ import lombok.Data;
 
 @Data
 public class DocumentRequest {
-    @NotNull private Long caseId;
-    @NotBlank @Size(min = 2, max = 255) private String title;
-    @NotNull private Document.DocumentType type;
-    @NotBlank private String uri;
-    @NotNull private Long uploadedBy;
+    @NotNull(message = "Case ID is required")
+    private Long caseId;
+    @NotBlank(message = "Title is required")
+    @Size(min = 2, max = 255) private String title;
+    @NotNull(message = "Document type is required")
+    private Document.DocumentType type;
+    private String uri;
+    @NotNull(message = "Uploaded By is required")
+    private String uploadedBy;
+
+    private String fileLocalPath;
+    private String originalFileName;
+    private String contentType;
 }

@@ -4,8 +4,12 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-@Entity @Table(name = "documents")
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Entity
+@Table(name = "documents")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Document {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long documentId;
     @Column(nullable = false) private Long caseId;
@@ -14,8 +18,20 @@ public class Document {
     @Column(nullable = false) private String uri;
     @Column(nullable = false) private LocalDateTime uploadedDate;
     @Column(nullable = false) @Enumerated(EnumType.STRING) private VerificationStatus verificationStatus;
-    @Column(nullable = false) private Long uploadedBy;
+    @Column(nullable = false) private String uploadedBy;
     private String rejectionReason;
+
+    @Column(length = 500)
+    private String fileLocalPath;
+
+    @Column(length = 500)
+    private String fileUrl;
+
+    @Column(length = 255)
+    private String originalFileName;
+
+    @Column(length = 100)
+    private String contentType;
 
     public enum DocumentType { PETITION, EVIDENCE, BRIEF, AFFIDAVIT, JUDGMENT, NOTICE, OTHER }
     public enum VerificationStatus { PENDING, VERIFIED, REJECTED }
