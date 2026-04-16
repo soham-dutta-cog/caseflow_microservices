@@ -40,7 +40,7 @@ spring:
         - id: case-swagger
           uri: lb://case-service
           predicates:
-            - Path=/case/swagger-ui/**, /case/v3/api-docs/**, /case/api-docs/**
+            - Path=/case/swagger-ui/**, /case/v3/api-docs/**, /case/api-docs/**, caseflow/api-docs/, caseflow/v3/api-docs/
           filters:
             - StripPrefix=1
 
@@ -66,7 +66,7 @@ spring:
         - id: workflow-swagger
           uri: lb://workflow-service
           predicates:
-            - Path=/workflow/swagger-ui/**, /workflow/v3/api-docs/**, /workflow/api-docs/**
+            - Path=/workflow/swagger-ui/**, /workflow/v3/api-docs, /workflow/v3/api-docs/**, /workflow/api-docs, /workflow/api-docs/**
           filters:
             - StripPrefix=1
 
@@ -150,3 +150,23 @@ eureka:
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: IAM Service
+        url: /iam/v3/api-docs
+      - name: Case Service
+        url: /case/api-docs
+      - name: Workflow Service
+        url: /workflow/api-docs
+      - name: Hearing Service
+        url: /hearing/v3/api-docs
+      - name: Appeal Service
+        url: /appeal/v3/api-docs
+      - name: Compliance Service
+        url: /compliance/v3/api-docs
+      - name: Notification Service
+        url: /notification/v3/api-docs
+      - name: Reporting Service
+        url: /reporting/v3/api-docs
