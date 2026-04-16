@@ -22,31 +22,32 @@ class UserServiceTest {
     @Mock private JwtUtil jwtUtil;
     @Mock private AuthenticationManager authenticationManager;
     @Mock private AuditLogService auditLogService;
+    @Mock private TokenBlacklistService tokenBlacklistService;
     @InjectMocks private UserService userService;
 
     @Test void getUserById_found() {
-        User user = User.builder().userId(1L).name("Test").role(User.Role.ADMIN)
+        User user = User.builder().userId("TES_ADMIN_1").name("Test").role(User.Role.ADMIN)
             .email("test@test.com").status(User.Status.ACTIVE).build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        UserResponse result = userService.getUserById(1L);
+        when(userRepository.findById("TES_ADMIN_1")).thenReturn(Optional.of(user));
+        UserResponse result = userService.getUserById("TES_ADMIN_1");
         assertEquals("Test", result.getName());
     }
 
     @Test void getUserById_notFound_throws() {
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById(99L));
+        when(userRepository.findById("INVALID_99")).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById("INVALID_99"));
     }
 
     @Test void register_duplicateEmail_throws() {
-        when(userRepository.existsByEmail("dup@test.com")).thenReturn(true);
+        when(userRepository.existsByEmail("dup@gmail.com")).thenReturn(true);
         UserRequest req = new UserRequest();
-        req.setEmail("dup@test.com"); req.setName("Dup"); req.setRole(User.Role.LITIGANT);
+        req.setEmail("dup@gmail.com"); req.setName("Dup"); req.setRole(User.Role.LITIGANT);
         req.setPhone("1234567890"); req.setPassword("pass123");
         assertThrows(DuplicateResourceException.class, () -> userService.registerLitigant(req));
     }
 
     @Test void existsById_true() {
-        when(userRepository.existsById(1L)).thenReturn(true);
-        assertTrue(userService.existsById(1L));
+        when(userRepository.existsById("TES_ADMIN_1")).thenReturn(true);
+        assertTrue(userService.existsById("TES_ADMIN_1"));
     }
 }

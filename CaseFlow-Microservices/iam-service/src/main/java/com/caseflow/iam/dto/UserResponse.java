@@ -4,6 +4,10 @@ import lombok.Data;
 
 @Data
 public class UserResponse {
-    private Long userId; private String name; private User.Role role;
-    private String email; private String phone; private User.Status status;
+    private String userId;
+    private String name;
+    private User.Role role;
+    private String email;
+    private String phone;
+    private User.Status status;
 }

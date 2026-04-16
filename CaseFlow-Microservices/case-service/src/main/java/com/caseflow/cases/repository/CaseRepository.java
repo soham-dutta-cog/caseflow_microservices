@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface CaseRepository extends JpaRepository<Case, Long> {
-    List<Case> findByLitigantId(Long litigantId);
-    List<Case> findByLawyerId(Long lawyerId);
+    List<Case> findByLitigantId(String litigantId);
+    List<Case> findByLawyerId(String lawyerId);
     List<Case> findByStatus(Case.CaseStatus status);
 }

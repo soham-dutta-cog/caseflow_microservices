@@ -4,139 +4,89 @@ server:
 spring:
   application:
     name: api-gateway
-  main:
-    web-application-type: reactive
   cloud:
     gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
       routes:
-        # ========== IAM SERVICE ==========
-        - id: iam-auth
+        - id: iam
           uri: lb://iam-service
           predicates:
             - Path=/api/auth/**
 
-        - id: iam-users
+        - id: iam-2
           uri: lb://iam-service
           predicates:
             - Path=/api/users/**
-
-        - id: iam-swagger
-          uri: lb://iam-service
-          predicates:
-            - Path=/iam/swagger-ui/**, /iam/v3/api-docs/**, /iam/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
-        # ========== CASE SERVICE ==========
-        - id: case-service
+        - id: case
           uri: lb://case-service
           predicates:
             - Path=/api/cases/**
-
-        - id: case-swagger
-          uri: lb://case-service
-          predicates:
-            - Path=/case/swagger-ui/**, /case/v3/api-docs/**, /case/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
-        # ========== HEARING SERVICE ==========
-        - id: hearing-service
+        - id: hearing
           uri: lb://hearing-service
           predicates:
             - Path=/api/hearings/**
-
-        - id: hearing-swagger
-          uri: lb://hearing-service
-          predicates:
-            - Path=/hearing/swagger-ui/**, /hearing/v3/api-docs/**, /hearing/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
-        # ========== WORKFLOW SERVICE ==========
-        - id: workflow-service
+        - id: workflow
           uri: lb://workflow-service
           predicates:
             - Path=/api/workflow/**
-
-        - id: workflow-swagger
-          uri: lb://workflow-service
-          predicates:
-            - Path=/workflow/swagger-ui/**, /workflow/v3/api-docs/**, /workflow/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
-        # ========== APPEAL SERVICE ==========
-        - id: appeal-service
+        - id: appeal
           uri: lb://appeal-service
           predicates:
             - Path=/api/appeals/**
-
-        - id: appeal-swagger
-          uri: lb://appeal-service
-          predicates:
-            - Path=/appeal/swagger-ui/**, /appeal/v3/api-docs/**, /appeal/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
-        # ========== COMPLIANCE SERVICE ==========
-        - id: compliance-service
+        - id: compliance
           uri: lb://compliance-service
           predicates:
             - Path=/api/compliance/**
+          filters:
+            - AuthenticationFilter
 
-        - id: compliance-audits
+        - id: compliance-2
           uri: lb://compliance-service
           predicates:
             - Path=/api/audits/**
-
-        - id: compliance-swagger
-          uri: lb://compliance-service
-          predicates:
-            - Path=/compliance/swagger-ui/**, /compliance/v3/api-docs/**, /compliance/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
-        # ========== NOTIFICATION SERVICE ==========
-        - id: notification-service
+        - id: notification
           uri: lb://notification-service
           predicates:
             - Path=/api/notifications/**
-
-        - id: notification-swagger
-          uri: lb://notification-service
-          predicates:
-            - Path=/notification/swagger-ui/**, /notification/v3/api-docs/**, /notification/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
-        # ========== REPORTING SERVICE ==========
-        - id: reporting-service
+        - id: reporting
           uri: lb://reporting-service
           predicates:
             - Path=/api/reports/**
-
-        - id: reporting-swagger
-          uri: lb://reporting-service
-          predicates:
-            - Path=/reporting/swagger-ui/**, /reporting/v3/api-docs/**, /reporting/api-docs/**
           filters:
-            - StripPrefix=1
+            - AuthenticationFilter
 
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
-
       globalcors:
-        cors-configurations:
+        corsConfigurations:
           '[/**]':
-            allowed-origins: "*"
-            allowed-methods: "*"
-            allowed-headers: "*"
-            exposed-headers: "*"
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+
+jwt:
+  secret: caseflow_secret_key_must_be_32chars_min_!!!
 
 eureka:
   client:
@@ -150,3 +100,23 @@ eureka:
 logging:
   level:
     org.springframework.cloud.gateway: DEBUG
+
+springdoc:
+  swagger-ui:
+    urls:
+      - name: IAM Service
+        url: /iam/api-docs
+      - name: Case Service
+        url: /case/api-docs
+      - name: Workflow Service
+        url: /workflow/api-docs
+      - name: Hearing Service
+        url: /hearing/api-docs
+      - name: Appeal Service
+        url: /appeal/api-docs
+      - name: Compliance Service
+        url: /compliance/api-docs
+      - name: Notification Service
+        url: /notification/api-docs
+      - name: Reporting Service
+        url: /reporting/api-docs

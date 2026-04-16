@@ -1,0 +1,92 @@
+.hiw-hero {
+  background: var(--cf-navy-950);
+  padding: 160px 0 80px;
+  text-align: center;
+}
+.hiw-hero__title {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vw, 50px);
+  font-weight: 600;
+  color: var(--cf-white);
+  line-height: 1.15;
+  margin-bottom: 20px;
+}
+.hiw-hero__sub {
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 560px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.hiw-timeline {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.hiw-step {
+  display: flex;
+  gap: 32px;
+  position: relative;
+}
+
+.hiw-step__marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.hiw-step__num {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--cf-navy-900);
+  color: var(--cf-gold-400);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hiw-step__line {
+  width: 2px;
+  flex: 1;
+  background: var(--cf-gray-200);
+  margin: 8px 0;
+}
+
+.hiw-step__content {
+  padding-bottom: 48px;
+}
+
+.hiw-step__title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--cf-navy-900);
+  margin-bottom: 8px;
+}
+
+.hiw-step__desc {
+  font-size: 15px;
+  color: var(--cf-gray-600);
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+.hiw-step__service {
+  display: inline-block;
+  padding: 4px 14px;
+  background: var(--cf-navy-50);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-navy-600);
+  font-family: monospace;
+}
+
+@media (max-width: 768px) {
+  .hiw-step { gap: 20px; }
+}

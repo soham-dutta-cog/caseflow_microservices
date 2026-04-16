@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service @RequiredArgsConstructor
@@ -18,6 +20,7 @@ public class UserService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final AuditLogService auditLogService;
+    private final TokenBlacklistService tokenBlocklistService;
 
     public UserResponse registerLitigant(UserRequest request) {
         request.setRole(User.Role.LITIGANT);
@@ -27,9 +30,15 @@ public class UserService {
     public UserResponse createUserByAdmin(UserRequest request) { return register(request); }
 
     private UserResponse register(UserRequest request) {
+        // Non-admin users must use a @gmail.com email
+        if (request.getRole() != User.Role.ADMIN && !request.getEmail().toLowerCase().endsWith("@gmail.com"))
+            throw new BadRequestException("Only @gmail.com email addresses are allowed for non-admin users");
+        if (request.getPassword() == null || request.getPassword().length() < 6)
+            throw new BadRequestException("Password must be at least 6 characters long");
         if (userRepository.existsByEmail(request.getEmail()))
             throw new DuplicateResourceException("Email already registered: " + request.getEmail());
-        User user = User.builder().name(request.getName()).role(request.getRole())
+        String customId = generateUserId(request.getName(), request.getRole());
+        User user = User.builder().userId(customId).name(request.getName()).role(request.getRole())
             .email(request.getEmail()).phone(request.getPhone())
             .password(passwordEncoder.encode(request.getPassword()))
             .status(User.Status.ACTIVE).build();
@@ -39,15 +48,20 @@ public class UserService {
     }
 
     public LoginResponse login(LoginRequest request) {
+        if (request.getPassword() == null || request.getPassword().length() < 6)
+            throw new BadRequestException("Password must be at least 6 characters long");
         authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
         User user = userRepository.findByEmail(request.getEmail())
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        // Non-admin users must have a @gmail.com email
+        if (user.getRole() != User.Role.ADMIN && !user.getEmail().toLowerCase().endsWith("@gmail.com"))
+            throw new BadRequestException("Only @gmail.com email addresses are allowed for non-admin users");
         if (user.getStatus() == User.Status.INACTIVE)
             throw new InvalidOperationException("User account is inactive");
         String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
         auditLogService.log(user.getUserId(), "USER_LOGIN", "User:" + user.getUserId());
-        return new LoginResponse(token, user.getRole().name(), user.getName());
+        return new LoginResponse(token, user.getRole().name(), user.getName(), user.getEmail());
     }
 
     public String changePassword(ChangePasswordRequest request) {
@@ -55,6 +69,10 @@ public class UserService {
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword()))
             throw new BadRequestException("Old password is incorrect");
+        if (request.getOldPassword().equals(request.getNewPassword()))
+            throw new BadRequestException("New password cannot be the same as the old password");
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 6)
+            throw new BadRequestException("New password must be at least 6 characters long");
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
         return "Password changed successfully";
@@ -64,31 +82,55 @@ public class UserService {
         return userRepository.findAll().stream().map(this::mapToResponse).toList();
     }
 
-    public UserResponse getUserById(Long id) {
+    public UserResponse getUserById(String id) {
         return mapToResponse(userRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id)));
     }
 
-    public UserResponse updateStatus(Long id, User.Status status) {
+    public UserResponse updateStatus(String id, User.Status status) {
         User user = userRepository.findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
         user.setStatus(status);
         return mapToResponse(userRepository.save(user));
     }
 
-    public boolean existsById(Long id) { return userRepository.existsById(id); }
+    public boolean existsById(String id) { return userRepository.existsById(id); }
 
-    public String getUserRole(Long id) {
+    public String adminResetPassword(String userId, String newPassword) {
+        if (newPassword == null || newPassword.length() < 6)
+            throw new BadRequestException("Password must be at least 6 characters long");
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        auditLogService.log(userId, "ADMIN_RESET_PASSWORD", "User:" + userId);
+        return "Password reset successfully for user: " + userId;
+    }
+
+    public String getUserRole(String id) {
         return userRepository.findById(id)
             .map(u -> u.getRole().name())
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
     }
 
-    public String deleteUser(Long userId) {
+    public String deleteUser(String userId) {
         userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
         userRepository.deleteById(userId);
         return "User deleted successfully";
+    }
+
+    private String generateUserId(String name, User.Role role) {
+        String prefix = name.replaceAll("[^a-zA-Z]", "").toUpperCase();
+        prefix = prefix.length() >= 3 ? prefix.substring(0, 3) : prefix;
+        long nextNum = userRepository.countByRole(role) + 1;
+        String id = prefix + "_" + role.name() + "_" + nextNum;
+        // Ensure uniqueness in case of gaps
+        while (userRepository.existsById(id)) {
+            nextNum++;
+            id = prefix + "_" + role.name() + "_" + nextNum;
+        }
+        return id;
     }
 
     private UserResponse mapToResponse(User user) {
@@ -97,5 +139,20 @@ public class UserService {
         res.setRole(user.getRole()); res.setEmail(user.getEmail());
         res.setPhone(user.getPhone()); res.setStatus(user.getStatus());
         return res;
+    }
+
+    public String logout(String email, String token) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Blocklist the token so it cannot be reused
+        if (token != null && jwtUtil.isTokenValid(token)) {
+            tokenBlocklistService.blocklistToken(token, (LocalDateTime) jwtUtil.extractExpiration(token));
+        }
+
+        auditLogService.log(user.getUserId(), "USER_LOGOUT",
+                "User:" + user.getUserId());
+
+        return "User logged out successfully. Token has been invalidated.";
     }
 }
