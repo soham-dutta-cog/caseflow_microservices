@@ -1,11 +1,17 @@
 server:
-  port: 8085
+  port: 9001
 
 spring:
   application:
     name: api-gateway
+  main:
+    web-application-type: reactive
   cloud:
     gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
       routes:
         - id: iam
           uri: lb://iam-service
@@ -78,12 +84,19 @@ spring:
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE
       globalcors:
-        corsConfigurations:
+        cors-configurations:
           '[/**]':
             allowedOrigins: "*"
-            allowedMethods: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
             allowedHeaders: "*"
-
+            exposedHeaders: "*"
+            allowCredentials: false
 
 jwt:
   secret: caseflow_secret_key_must_be_32chars_min_!!!

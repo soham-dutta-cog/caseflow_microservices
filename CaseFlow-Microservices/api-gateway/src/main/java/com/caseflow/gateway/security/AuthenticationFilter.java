@@ -5,16 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.factory.AbstractGatewayFilterFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
 
-/**
- * Spring Cloud Gateway filter that validates JWT tokens on secured routes.
- * Usage in application.yml:
- *   filters:
- *     - AuthenticationFilter
- */
 @Component
 @Slf4j
 public class AuthenticationFilter extends AbstractGatewayFilterFactory<AuthenticationFilter.Config> {
@@ -33,6 +28,11 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
         return (exchange, chain) -> {
             ServerHttpRequest request = exchange.getRequest();
             String path = request.getURI().getPath();
+
+            // Always allow CORS preflight requests (OPTIONS)
+            if (request.getMethod() == HttpMethod.OPTIONS) {
+                return chain.filter(exchange);
+            }
 
             // Skip validation for open/public endpoints
             if (!routeValidator.isSecured.test(path)) {
@@ -68,7 +68,6 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 String email = claims.getSubject();
                 String role = (String) claims.get("role");
 
-                // Add user info headers so downstream services know who the caller is
                 ServerHttpRequest modifiedRequest = request.mutate()
                         .header("X-Auth-User-Email", email)
                         .header("X-Auth-User-Role", role)
@@ -86,6 +85,5 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
     }
 
     public static class Config {
-        // Configuration properties can be added here if needed in the future
     }
 }
