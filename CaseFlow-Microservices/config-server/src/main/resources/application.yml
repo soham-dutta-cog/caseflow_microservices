@@ -9,11 +9,11 @@ spring:
       server:
         git:
           uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
-          default-label: main
+          default-label: rashad-config
           clone-on-start: true
           skip-ssl-validation: true
-          username: soham-dutta-cog
-          password: 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
+          username: rashadahmedz
+          password: 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
 
 eureka:
   client:
