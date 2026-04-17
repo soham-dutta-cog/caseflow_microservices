@@ -5,7 +5,8 @@
 [![Spring Cloud](https://img.shields.io/badge/Spring%20Cloud-2023.0.1-blue)](https://spring.io/projects/spring-cloud)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A robust microservices architecture for case management systems, built with Spring Boot and Spring Cloud. This project provides a scalable, resilient platform for handling legal cases, appeals, hearings, workflows, compliance, notifications, and reporting.
+A robust microservices architecture for case management systems, built with Spring Boot and React.
+This project provides a scalable, resilient platform for handling legal cases, appeals, hearings, workflows, compliance, notifications, and reporting.
 
 ## 📋 Table of Contents
 
@@ -19,7 +20,6 @@ A robust microservices architecture for case management systems, built with Spri
 - [Database Configuration](#database-configuration)
 - [Testing](#testing)
 - [Contributing](#contributing)
-- [License](#license)
 
 ## ✨ Features
 
@@ -53,12 +53,12 @@ A robust microservices architecture for case management systems, built with Spri
                     ┌─────────────┐ ┌─────────┐ ┌─────────┐
                     │Workflow     │ │Appeal   │ │Compliance│
                     │Service      │ │Service  │ │Service  │
-                    │ (8084)      │ │ (8086)  │ │ (8087)  │
+                    │ (8084)      │ │ (8085)  │ │ (8086)  │
                     └─────────────┘ └─────────┘ └─────────┘
                     ┌─────────────┐ ┌─────────┐
                     │Notification │ │Reporting│
                     │Service      │ │Service  │
-                    │ (8088)      │ │ (8089)  │
+                    │ (8087)      │ │ (8088)  │
                     └─────────────┘ └─────────┘
 ```
 
@@ -67,16 +67,16 @@ A robust microservices architecture for case management systems, built with Spri
 | Service              | Port | Database                  | Description |
 |----------------------|------|---------------------------|-------------|
 | **Eureka Server**    | 8761 | -                         | Service registry and discovery |
-| **Config Server**    | -    | -                         | Centralized configuration management |
-| **API Gateway**      | 8085 | -                         | API routing and load balancing |
+| **Config Server**    | 8888 | -                         | Centralized configuration management |
+| **API Gateway**      | 9001 | -                         | API routing and load balancing |
 | **IAM Service**      | 8081 | `caseflow_iam_db`         | Identity and Access Management |
 | **Case Service**     | 8082 | `caseflow_case_db`        | Case management and tracking |
 | **Hearing Service**  | 8083 | `caseflow_hearing_db`     | Hearing scheduling and management |
 | **Workflow Service** | 8084 | `caseflow_workflow_db`    | Business process workflows |
-| **Appeal Service**   | 8086 | `caseflow_appeal_db`      | Appeal handling and processing |
-| **Compliance Service**| 8087 | `caseflow_compliance_db`  | Regulatory compliance checks |
-| **Notification Service**| 8088 | `caseflow_notification_db`| Notifications and alerts |
-| **Reporting Service**| 8089 | `caseflow_reporting_db`  | Analytics and reporting |
+| **Appeal Service**   | 8085 | `caseflow_appeal_db`      | Appeal handling and processing |
+| **Compliance Service**| 8086 | `caseflow_compliance_db` | Regulatory compliance checks |
+| **Notification Service**| 8087 | `caseflow_notification_db`| Notifications and alerts |
+| **Reporting Service**| 8088 | `caseflow_reporting_db`   | Analytics and reporting |
 
 ## 📋 Prerequisites
 
@@ -89,11 +89,11 @@ A robust microservices architecture for case management systems, built with Spri
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/caseflow-microservices.git
+   git clone https://github.com/soham-dutta-cog/caseflow-microservices.git
    cd caseflow-microservices
    ```
 
-2. **Set up MySQL databases:**
+2. **Set up MySQL databases:** (Only for manual backend access, otherwise database is created automatically)
    Create the following databases in MySQL:
    ```sql
    CREATE DATABASE caseflow_iam_db;
@@ -108,16 +108,16 @@ A robust microservices architecture for case management systems, built with Spri
 
 3. **Configure database credentials:**
    Update `application.yml` in each service directory if needed. Default credentials:
-   - Username: `root`
-   - Password: `11222004`
+   - Username: `your_username`
+   - Password: `your_password`
 
 ## ▶️ Running the Application
 
 ### Startup Order
 
 1. **Eureka Server** (8761) — Service registry
-2. **Config Server** — Centralized configuration
-3. **API Gateway** (8085) — Routes all `/api/**` to services
+2. **Config Server** — (8888) Centralized configuration - Github - `https://github.com/soham-dutta-cog/caseflow_config_server.git`
+3. **API Gateway** (9001) — Routes all `/api/**` to services
 4. **IAM Service** (8081) — Auth & user management (start first among business services)
 5. **All other services** — Can be started in any order
 
@@ -156,18 +156,18 @@ Each service provides interactive API documentation via Swagger UI:
 - **Case Service**: http://localhost:8082/swagger-ui.html
 - **Hearing Service**: http://localhost:8083/swagger-ui.html
 - **Workflow Service**: http://localhost:8084/swagger-ui.html
-- **Appeal Service**: http://localhost:8086/swagger-ui.html
-- **Compliance Service**: http://localhost:8087/swagger-ui.html
-- **Notification Service**: http://localhost:8088/swagger-ui.html
-- **Reporting Service**: http://localhost:8089/swagger-ui.html
+- **Appeal Service**: http://localhost:8085/swagger-ui.html
+- **Compliance Service**: http://localhost:8086/swagger-ui.html
+- **Notification Service**: http://localhost:8087/swagger-ui.html
+- **Reporting Service**: http://localhost:8088/swagger-ui.html
 
 ## 🗄️ Database Configuration
 
 ### Default MySQL Credentials
 - **Host**: localhost
 - **Port**: 3306
-- **Username**: root
-- **Password**: 11222004
+- **Username**: your_username
+- **Password**: your_password
 
 ### Database Schema
 Each service automatically creates its database schema on startup using JPA/Hibernate.
@@ -192,10 +192,5 @@ cd <service-name> && mvn test
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-**Built with ❤️ using Spring Boot and Spring Cloud**
+**Built with ❤️ using Spring Boot and React**
