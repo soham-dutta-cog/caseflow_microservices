@@ -7,4 +7,5 @@ import java.util.List;
 public interface ReportRepository extends JpaRepository<Report, Long> {
     List<Report> findByRequestedBy(Long userId);
     List<Report> findByScope(ReportScope scope);
+    List<Report> findByScopeAndScopeValue(ReportScope scope, String scopeValue);
 }

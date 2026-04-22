@@ -11,5 +11,5 @@ public class Report {
     @Column(nullable = false, columnDefinition = "TEXT") private String metrics;
     @Column(nullable = false) private LocalDate generatedDate;
     @Column(nullable = false) private Long requestedBy;
-    public enum ReportScope { COURT, JUDGE, PERIOD }
+    public enum ReportScope { COURT, JUDGE, PERIOD, CLERK, LAWYER }
 }
