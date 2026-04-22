@@ -3,3 +3,56 @@ spring:
     name: iam-service
   config:
     import: optional:configserver:http://localhost:8888
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+
+
+  application:
+    name: iam-service
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans
+
+
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      userServiceCB:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+
+
+
+
+  spring:
+    application:
+      name: iam-service
+
+  management:
+
+    server:
+      port: 9991
+    endpoints:
+      web:
+        exposure:
+          include: health,info
+    health:
+      circuitbreakers:
+        enabled: true
+
+

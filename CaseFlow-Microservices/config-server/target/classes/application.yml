@@ -15,6 +15,13 @@ spring:
           username: rashadahmedz
           password: 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
 
+          my-new-repo:
+            pattern: "iam-service"
+            uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
+            username: varun-2S
+            password: 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
+            default-label: varun-branch
+            clone-on-start: true
 eureka:
   client:
     service-url:
