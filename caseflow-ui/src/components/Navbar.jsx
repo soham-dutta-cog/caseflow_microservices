@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import './Navbar.css'
 
 export default function Navbar() {
+  const { user } = useAuth()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
@@ -30,7 +32,11 @@ export default function Navbar() {
           <Link to="/about" className={`navbar__link ${location.pathname === '/about' ? 'active' : ''}`}>About</Link>
           <Link to="/how-it-works" className={`navbar__link ${location.pathname === '/how-it-works' ? 'active' : ''}`}>How It Works</Link>
           <Link to="/contact" className={`navbar__link ${location.pathname === '/contact' ? 'active' : ''}`}>Contact</Link>
-          <Link to="/login" className="btn btn-primary navbar__cta">Sign In</Link>
+          {user ? (
+            <Link to="/dashboard" className="btn btn-primary navbar__cta">Dashboard</Link>
+          ) : (
+            <Link to="/login" className="btn btn-primary navbar__cta">Sign In</Link>
+          )}
         </div>
 
         <button className="navbar__hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
