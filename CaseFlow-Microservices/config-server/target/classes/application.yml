@@ -9,12 +9,19 @@ spring:
       server:
         git:
           uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
-          default-label: main
+          default-label: rashad-config
           clone-on-start: true
           skip-ssl-validation: true
-          username: soham-dutta-cog
-          password: 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
+          username: rashadahmedz
+          password: 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
 
+          my-new-repo:
+            pattern: "iam-service"
+            uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
+            username: varun-2S
+            password: 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
+            default-label: varun-branch
+            clone-on-start: true
 eureka:
   client:
     service-url:
