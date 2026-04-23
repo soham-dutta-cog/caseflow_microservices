@@ -6,6 +6,7 @@ import com.caseflow.iam.exception.*;
 import com.caseflow.iam.repository.UserRepository;
 import com.caseflow.iam.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service @RequiredArgsConstructor
+@Slf4j
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -21,13 +23,36 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private final AuditLogService auditLogService;
     private final TokenBlacklistService tokenBlocklistService;
+    private final EmailService emailService;
 
     public UserResponse registerLitigant(UserRequest request) {
         request.setRole(User.Role.LITIGANT);
         return register(request);
     }
 
-    public UserResponse createUserByAdmin(UserRequest request) { return register(request); }
+    public UserResponse createUserByAdmin(UserRequest request) {
+        UserResponse response = register(request);
+        try {
+            sendAccountCreationEmail(request.getEmail(), request.getName(), request.getPassword());
+        } catch (RuntimeException ex) {
+            // Keep user creation successful even when mail provider is temporarily unavailable.
+            log.warn("User created but welcome email could not be sent to {}", request.getEmail(), ex);
+        }
+        return response;
+    }
+
+    private void sendAccountCreationEmail(String email, String name, String rawPassword) {
+        String subject = "Your CaseFlow Account Has Been Created";
+        String body = "Dear " + name + ",\n\n"
+                + "Your CaseFlow account has been successfully created by an administrator.\n\n"
+                + "Your login credentials are:\n"
+                + "  Email:    " + email + "\n"
+                + "  Password: " + rawPassword + "\n\n"
+                + "IMPORTANT: Please change your password after your first login.\n\n"
+                + "Regards,\n"
+                + "CaseFlow Admin";
+        emailService.sendEmail(email, subject, body);
+    }
 
     private UserResponse register(UserRequest request) {
         // Non-admin users must use a @gmail.com email
