@@ -25,45 +25,49 @@ export default function CaseList() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Cases</h1>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="page-title h3 mb-0">Cases</h1>
         {(user?.role === 'LITIGANT' || user?.role === 'LAWYER' || user?.role === 'CLERK' || user?.role === 'ADMIN') && (
-          <Link to="/cases/file" className="btn btn-primary">+ File New Case</Link>
+          <Link to="/cases/file" className="btn btn-dark">+ File New Case</Link>
         )}
       </div>
 
-      <div className="card">
-        <div className="flex-row" style={{ marginBottom: 14 }}>
-          <label>Filter by status:</label>
-          <select value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="">All</option>
-            {CASE_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button className="btn btn-ghost btn-sm" onClick={load}>Refresh</button>
+      <div className="card shadow-sm">
+        <div className="card-body">
+          <div className="d-flex gap-2 align-items-center flex-wrap mb-3">
+            <label className="form-label fw-semibold small mb-0">Filter by status:</label>
+            <select className="form-select form-select-sm w-auto" value={filter} onChange={e => setFilter(e.target.value)}>
+              <option value="">All</option>
+              {CASE_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <button className="btn btn-outline-secondary btn-sm" onClick={load}>Refresh</button>
+          </div>
+          {err && <div className="alert alert-danger py-2">{err}</div>}
+          {loading ? <div className="text-center text-muted py-4">Loading...</div> : list.length === 0 ? (
+            <div className="text-center text-muted py-4">No cases found</div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
+                  <tr><th>ID</th><th>Title</th><th>Litigant</th><th>Lawyer</th><th>Status</th><th>Filed</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {list.map(c => (
+                    <tr key={c.caseId}>
+                      <td>#{c.caseId}</td>
+                      <td>{c.title}</td>
+                      <td>{c.litigantId}</td>
+                      <td>{c.lawyerId || '-'}</td>
+                      <td><span className={`badge rounded-pill ${statusBadgeClass(c.status)}`}>{c.status}</span></td>
+                      <td>{formatDate(c.filedDate)}</td>
+                      <td><Link to={`/cases/${c.caseId}`} className="btn btn-outline-secondary btn-sm">Open</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        {err && <div className="alert alert-error">{err}</div>}
-        {loading ? <div className="empty">Loading...</div> : list.length === 0 ? (
-          <div className="empty">No cases found</div>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr><th>ID</th><th>Title</th><th>Litigant</th><th>Lawyer</th><th>Status</th><th>Filed</th><th></th></tr>
-            </thead>
-            <tbody>
-              {list.map(c => (
-                <tr key={c.caseId}>
-                  <td>#{c.caseId}</td>
-                  <td>{c.title}</td>
-                  <td>{c.litigantId}</td>
-                  <td>{c.lawyerId || '-'}</td>
-                  <td><span className={`badge-pill ${statusBadgeClass(c.status)}`}>{c.status}</span></td>
-                  <td>{formatDate(c.filedDate)}</td>
-                  <td><Link to={`/cases/${c.caseId}`} className="btn btn-ghost btn-sm">Open</Link></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
     </div>
   )

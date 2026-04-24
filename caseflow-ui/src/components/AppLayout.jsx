@@ -50,36 +50,34 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="app-layout">
-      <aside className="app-sidebar">
-        <div className="app-sidebar__header">
-          <Link to="/dashboard" className="app-sidebar__logo">⚖ CaseFlow</Link>
-          <div className="app-sidebar__user">
-            <div className="app-sidebar__user-name">{user?.name}</div>
-            <div className="app-sidebar__user-role">{user?.role}</div>
-          </div>
+    <div className="app-layout d-flex">
+      <aside className="app-sidebar d-flex flex-column">
+        <div className="p-3 sidebar-divider">
+          <Link to="/dashboard" className="app-brand d-block mb-2">⚖ CaseFlow</Link>
+          <div className="fw-semibold small">{user?.name}</div>
+          <div className="user-role">{user?.role}</div>
         </div>
-        <nav className="app-sidebar__nav">
+        <nav className="nav nav-pills flex-column flex-grow-1 overflow-auto py-2">
           {visibleNav.map(item => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.to === '/dashboard'}
-              className={({ isActive }) => `app-sidebar__link ${isActive ? 'active' : ''}`}
+              className={({ isActive }) => `nav-link d-flex justify-content-between align-items-center ${isActive ? 'active' : ''}`}
             >
-              {item.label}
+              <span>{item.label}</span>
               {item.to === '/notifications' && unread > 0 && (
-                <span className="badge">{unread}</span>
+                <span className="badge rounded-pill text-bg-danger">{unread}</span>
               )}
             </NavLink>
           ))}
         </nav>
-        <div className="app-sidebar__footer">
-          <Link to="/change-password" className="app-sidebar__footer-link">Change Password</Link>
-          <button onClick={handleLogout} className="app-sidebar__logout">Logout</button>
+        <div className="p-3 sidebar-divider d-flex flex-column gap-2">
+          <Link to="/change-password" className="text-decoration-none small" style={{ color: '#94a5c5' }}>Change Password</Link>
+          <button onClick={handleLogout} className="btn btn-outline-light btn-sm">Logout</button>
         </div>
       </aside>
-      <main className="app-main">
+      <main className="app-main flex-grow-1">
         <Outlet />
       </main>
     </div>

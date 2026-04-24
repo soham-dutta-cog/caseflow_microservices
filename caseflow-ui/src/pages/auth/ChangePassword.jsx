@@ -22,25 +22,29 @@ export default function ChangePassword() {
 
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">Change Password</h1></div>
-      <div className="card" style={{ maxWidth: 500 }}>
-        {err && <div className="alert alert-error">{err}</div>}
-        {msg && <div className="alert alert-success">{msg}</div>}
-        <form onSubmit={submit}>
-          <div className="form-row">
-            <label>Email</label>
-            <input value={user?.email || ''} disabled />
-          </div>
-          <div className="form-row">
-            <label>Current Password</label>
-            <input type="password" value={form.oldPassword} onChange={e => setForm({ ...form, oldPassword: e.target.value })} required />
-          </div>
-          <div className="form-row">
-            <label>New Password</label>
-            <input type="password" minLength={6} value={form.newPassword} onChange={e => setForm({ ...form, newPassword: e.target.value })} required />
-          </div>
-          <button className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : 'Change Password'}</button>
-        </form>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="page-title h3 mb-0">Change Password</h1>
+      </div>
+      <div className="card shadow-sm" style={{ maxWidth: 500 }}>
+        <div className="card-body">
+          {err && <div className="alert alert-danger py-2">{err}</div>}
+          {msg && <div className="alert alert-success py-2">{msg}</div>}
+          <form onSubmit={submit}>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Email</label>
+              <input className="form-control" value={user?.email || ''} disabled />
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Current Password</label>
+              <input className="form-control" type="password" value={form.oldPassword} onChange={e => setForm({ ...form, oldPassword: e.target.value })} required />
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">New Password</label>
+              <input className="form-control" type="password" minLength={6} value={form.newPassword} onChange={e => setForm({ ...form, newPassword: e.target.value })} required />
+            </div>
+            <button className="btn btn-dark" disabled={loading}>{loading ? 'Saving...' : 'Change Password'}</button>
+          </form>
+        </div>
       </div>
     </div>
   )

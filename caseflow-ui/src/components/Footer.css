@@ -1,59 +1,26 @@
-.footer {
+/* Dark-themed footer — keeps only brand colors (navy/gold tokens),
+   Playfair Display logo, and the custom gold hover for links. All
+   layout/spacing is handled by Bootstrap utilities in the JSX. */
+
+/* ===== Surface & brand colors ===== */
+.cf-footer {
   background: var(--cf-navy-950);
   color: rgba(255, 255, 255, 0.6);
-  padding: 80px 0 40px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.footer__grid {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr;
-  gap: 48px;
-  margin-bottom: 60px;
-}
+/* ===== Brand logo typography ===== */
+.cf-footer__logo-icon { filter: grayscale(1) brightness(2); }
+.cf-footer__logo-text { font-family: var(--font-display); color: var(--cf-white); }
+.cf-footer__logo-accent { color: var(--cf-gold-400); }
 
-.footer__logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.footer__logo-icon { font-size: 22px; filter: grayscale(1) brightness(2); }
-.footer__logo-text { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--cf-white); }
-.footer__logo-accent { color: var(--cf-gold-400); }
-.footer__tagline { font-size: 14px; line-height: 1.7; max-width: 280px; }
-
-.footer__heading {
-  color: var(--cf-white);
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 20px;
-}
-
-.footer__col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.footer__link {
-  font-size: 14px;
+/* ===== Link color + branded gold hover ===== */
+.cf-footer__link {
+  color: rgba(255, 255, 255, 0.6);
   transition: color var(--duration-fast);
 }
-a.footer__link:hover { color: var(--cf-gold-400); }
+a.cf-footer__link:hover { color: var(--cf-gold-400); }
 
-.footer__bottom {
-  padding-top: 32px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-}
-.footer__built { color: rgba(255, 255, 255, 0.35); }
-
-@media (max-width: 768px) {
-  .footer__grid { grid-template-columns: 1fr 1fr; gap: 36px; }
-  .footer__bottom { flex-direction: column; gap: 8px; }
-}
+/* ===== Bottom divider bar ===== */
+.cf-footer__bottom { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.cf-footer__built { color: rgba(255, 255, 255, 0.35); }

@@ -25,38 +25,42 @@ export default function HearingList() {
 
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Hearings</h1>
-        {canSchedule && <Link to="/hearings/schedule" className="btn btn-primary">+ Schedule Hearing</Link>}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="page-title h3 mb-0">Hearings</h1>
+        {canSchedule && <Link to="/hearings/schedule" className="btn btn-dark">+ Schedule Hearing</Link>}
       </div>
-      <div className="card">
-        <div className="flex-row" style={{ marginBottom: 14 }}>
-          <label>Filter:</label>
-          <select value={filter} onChange={e => setFilter(e.target.value)}>
-            <option value="">All</option>
-            {HEARING_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button className="btn btn-ghost btn-sm" onClick={load}>Refresh</button>
+      <div className="card shadow-sm">
+        <div className="card-body">
+          <div className="d-flex gap-2 align-items-center flex-wrap mb-3">
+            <label className="form-label fw-semibold small mb-0">Filter:</label>
+            <select className="form-select form-select-sm w-auto" value={filter} onChange={e => setFilter(e.target.value)}>
+              <option value="">All</option>
+              {HEARING_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <button className="btn btn-outline-secondary btn-sm" onClick={load}>Refresh</button>
+          </div>
+          {err && <div className="alert alert-danger py-2">{err}</div>}
+          {loading ? <div className="text-center text-muted py-4">Loading...</div> : list.length === 0 ? <div className="text-center text-muted py-4">No hearings</div> : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light"><tr><th>ID</th><th>Case</th><th>Judge</th><th>Date</th><th>Time</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {list.map(h => (
+                    <tr key={h.hearingId}>
+                      <td>#{h.hearingId}</td>
+                      <td><Link to={`/cases/${h.caseId}`}>#{h.caseId}</Link></td>
+                      <td>{h.judgeId}</td>
+                      <td>{formatDate(h.hearingDate)}</td>
+                      <td>{h.hearingTime}</td>
+                      <td><span className={`badge rounded-pill ${statusBadgeClass(h.status)}`}>{h.status}</span></td>
+                      <td><Link to={`/hearings/${h.hearingId}`} className="btn btn-outline-secondary btn-sm">Open</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        {err && <div className="alert alert-error">{err}</div>}
-        {loading ? <div className="empty">Loading...</div> : list.length === 0 ? <div className="empty">No hearings</div> : (
-          <table className="table">
-            <thead><tr><th>ID</th><th>Case</th><th>Judge</th><th>Date</th><th>Time</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-              {list.map(h => (
-                <tr key={h.hearingId}>
-                  <td>#{h.hearingId}</td>
-                  <td><Link to={`/cases/${h.caseId}`}>#{h.caseId}</Link></td>
-                  <td>{h.judgeId}</td>
-                  <td>{formatDate(h.hearingDate)}</td>
-                  <td>{h.hearingTime}</td>
-                  <td><span className={`badge-pill ${statusBadgeClass(h.status)}`}>{h.status}</span></td>
-                  <td><Link to={`/hearings/${h.hearingId}`} className="btn btn-ghost btn-sm">Open</Link></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
       </div>
     </div>
   )

@@ -30,24 +30,26 @@ export default function FileCase() {
 
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">File New Case</h1></div>
-      <div className="card" style={{ maxWidth: 640 }}>
-        {err && <div className="alert alert-error">{err}</div>}
-        <form onSubmit={submit}>
-          <div className="form-row">
-            <label>Case Title</label>
-            <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} minLength={3} maxLength={255} required />
-          </div>
-          <div className="form-row">
-            <label>Litigant ID (user email or id)</label>
-            <input value={form.litigantId} onChange={e => setForm({ ...form, litigantId: e.target.value })} required />
-          </div>
-          <div className="form-row">
-            <label>Lawyer ID (optional)</label>
-            <input value={form.lawyerId} onChange={e => setForm({ ...form, lawyerId: e.target.value })} />
-          </div>
-          <button className="btn btn-primary" disabled={loading}>{loading ? 'Filing...' : 'File Case'}</button>
-        </form>
+      <div className="d-flex justify-content-between align-items-center mb-4"><h1 className="page-title h3 mb-0">File New Case</h1></div>
+      <div className="card shadow-sm" style={{ maxWidth: 640 }}>
+        <div className="card-body">
+          {err && <div className="alert alert-danger py-2">{err}</div>}
+          <form onSubmit={submit}>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Case Title</label>
+              <input className="form-control" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} minLength={3} maxLength={255} required />
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Litigant ID (user email or id)</label>
+              <input className="form-control" value={form.litigantId} onChange={e => setForm({ ...form, litigantId: e.target.value })} required />
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Lawyer ID (optional)</label>
+              <input className="form-control" value={form.lawyerId} onChange={e => setForm({ ...form, lawyerId: e.target.value })} />
+            </div>
+            <button className="btn btn-dark" disabled={loading}>{loading ? 'Filing...' : 'File Case'}</button>
+          </form>
+        </div>
       </div>
     </div>
   )

@@ -35,53 +35,60 @@ export default function Dashboard() {
     return () => { active = false }
   }, [user])
 
+  const statCards = [
+    { to: '/cases', label: 'Total Cases', value: stats.cases },
+    { to: '/hearings', label: 'Hearings', value: stats.hearings },
+    { to: '/appeals', label: 'Appeals', value: stats.appeals },
+    { to: '/workflow', label: 'SLA Breached', value: stats.breached, danger: stats.breached > 0 },
+  ]
+
   return (
     <div>
-      <div className="page-header">
-        <h1 className="page-title">Welcome, {user?.name}</h1>
-        <span className="muted">Role: {user?.role}</span>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1 className="page-title h3 mb-0">Welcome, {user?.name}</h1>
+        <span className="text-muted small">Role: {user?.role}</span>
       </div>
-      {err && <div className="alert alert-error">{err}</div>}
+      {err && <div className="alert alert-danger py-2">{err}</div>}
 
-      <div className="stats-grid">
-        <Link to="/cases" className="stat" style={{ textDecoration: 'none' }}>
-          <div className="stat__label">Total Cases</div>
-          <div className="stat__value">{stats.cases}</div>
-        </Link>
-        <Link to="/hearings" className="stat" style={{ textDecoration: 'none' }}>
-          <div className="stat__label">Hearings</div>
-          <div className="stat__value">{stats.hearings}</div>
-        </Link>
-        <Link to="/appeals" className="stat" style={{ textDecoration: 'none' }}>
-          <div className="stat__label">Appeals</div>
-          <div className="stat__value">{stats.appeals}</div>
-        </Link>
-        <Link to="/workflow" className="stat" style={{ textDecoration: 'none' }}>
-          <div className="stat__label">SLA Breached</div>
-          <div className="stat__value" style={{ color: stats.breached > 0 ? '#f07068' : undefined }}>{stats.breached}</div>
-        </Link>
+      <div className="row g-3 mb-4">
+        {statCards.map(s => (
+          <div className="col-sm-6 col-lg-3" key={s.to}>
+            <Link to={s.to} className="card shadow-sm text-decoration-none h-100">
+              <div className="card-body">
+                <div className="text-uppercase text-muted small fw-semibold" style={{ letterSpacing: '0.5px' }}>{s.label}</div>
+                <div className="fs-2 fw-bold mt-1" style={{ color: s.danger ? '#f07068' : '#0f1629' }}>{s.value}</div>
+              </div>
+            </Link>
+          </div>
+        ))}
       </div>
 
-      <div className="card">
-        <h3>Recent Cases</h3>
-        {recentCases.length === 0 ? (
-          <div className="empty">No cases yet. <Link to="/cases/file">File a case</Link></div>
-        ) : (
-          <table className="table">
-            <thead><tr><th>ID</th><th>Title</th><th>Status</th><th>Filed</th><th></th></tr></thead>
-            <tbody>
-              {recentCases.map(c => (
-                <tr key={c.caseId}>
-                  <td>#{c.caseId}</td>
-                  <td>{c.title}</td>
-                  <td><span className={`badge-pill ${statusBadgeClass(c.status)}`}>{c.status}</span></td>
-                  <td>{formatDate(c.filedDate)}</td>
-                  <td><Link to={`/cases/${c.caseId}`} className="btn btn-ghost btn-sm">View</Link></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="card shadow-sm">
+        <div className="card-body">
+          <h3 className="h5 mb-3">Recent Cases</h3>
+          {recentCases.length === 0 ? (
+            <div className="text-center text-muted py-4">No cases yet. <Link to="/cases/file">File a case</Link></div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light">
+                  <tr><th>ID</th><th>Title</th><th>Status</th><th>Filed</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {recentCases.map(c => (
+                    <tr key={c.caseId}>
+                      <td>#{c.caseId}</td>
+                      <td>{c.title}</td>
+                      <td><span className={`badge rounded-pill ${statusBadgeClass(c.status)}`}>{c.status}</span></td>
+                      <td>{formatDate(c.filedDate)}</td>
+                      <td><Link to={`/cases/${c.caseId}`} className="btn btn-outline-secondary btn-sm">View</Link></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
