@@ -45,75 +45,87 @@ export default function AppealDetail() {
     try { await appeals.updateOutcome(review.reviewId, { outcome: newOutcome }); setMsg('Outcome updated'); load() } catch (e) { setErr(e.message) }
   }
 
-  if (!a) return <div><div className="page-header"><h1 className="page-title">Appeal</h1></div>{err && <div className="alert alert-error">{err}</div>}<div className="card">Loading...</div></div>
+  if (!a) return (
+    <div>
+      <div className="d-flex justify-content-between align-items-center mb-4"><h1 className="page-title h3 mb-0">Appeal</h1></div>
+      {err && <div className="alert alert-danger py-2">{err}</div>}
+      <div className="card shadow-sm"><div className="card-body">Loading...</div></div>
+    </div>
+  )
 
   const isJudge = user?.role === 'JUDGE' || user?.role === 'ADMIN'
 
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">Appeal #{a.appealId}</h1></div>
-      {err && <div className="alert alert-error">{err}</div>}
-      {msg && <div className="alert alert-success">{msg}</div>}
+      <div className="d-flex justify-content-between align-items-center mb-4"><h1 className="page-title h3 mb-0">Appeal #{a.appealId}</h1></div>
+      {err && <div className="alert alert-danger py-2">{err}</div>}
+      {msg && <div className="alert alert-success py-2">{msg}</div>}
 
-      <div className="card">
-        <h3>Appeal Info</h3>
-        <div className="form-grid">
-          <div><strong>Case:</strong> <Link to={`/cases/${a.caseId}`}>#{a.caseId}</Link></div>
-          <div><strong>Filed:</strong> {formatDate(a.filedDate)}</div>
-          <div><strong>By user:</strong> {a.filedByUserId}</div>
-          <div><strong>Status:</strong> <span className={`badge-pill ${statusBadgeClass(a.status)}`}>{a.status}</span></div>
+      <div className="card shadow-sm mb-3">
+        <div className="card-body">
+          <h3 className="h5 mb-3">Appeal Info</h3>
+          <div className="row g-3">
+            <div className="col-md-6"><strong>Case:</strong> <Link to={`/cases/${a.caseId}`}>#{a.caseId}</Link></div>
+            <div className="col-md-6"><strong>Filed:</strong> {formatDate(a.filedDate)}</div>
+            <div className="col-md-6"><strong>By user:</strong> {a.filedByUserId}</div>
+            <div className="col-md-6"><strong>Status:</strong> <span className={`badge rounded-pill ${statusBadgeClass(a.status)}`}>{a.status}</span></div>
+          </div>
+          <div className="mt-3"><strong>Reason:</strong> {a.reason}</div>
         </div>
-        <div style={{ marginTop: 10 }}><strong>Reason:</strong> {a.reason}</div>
       </div>
 
       {isJudge && !review && (
-        <div className="card">
-          <h3>Open Review</h3>
-          <div className="flex-row">
-            <input type="number" placeholder="Judge ID" value={judgeId} onChange={e => setJudgeId(e.target.value)} />
-            <button className="btn btn-primary" onClick={openReview} disabled={!judgeId}>Open Review</button>
+        <div className="card shadow-sm mb-3">
+          <div className="card-body">
+            <h3 className="h5 mb-3">Open Review</h3>
+            <div className="d-flex gap-2 align-items-center flex-wrap">
+              <input className="form-control form-control-sm w-auto" type="number" placeholder="Judge ID" value={judgeId} onChange={e => setJudgeId(e.target.value)} />
+              <button className="btn btn-dark" onClick={openReview} disabled={!judgeId}>Open Review</button>
+            </div>
           </div>
         </div>
       )}
 
       {review && (
-        <div className="card">
-          <h3>Review</h3>
-          <div className="form-grid">
-            <div><strong>Review ID:</strong> #{review.reviewId}</div>
-            <div><strong>Judge:</strong> {review.judgeId}</div>
-            <div><strong>Date:</strong> {formatDate(review.reviewDate)}</div>
-            <div><strong>Outcome:</strong> {review.outcome || '-'}</div>
-          </div>
-          {review.remarks && <div style={{ marginTop: 10 }}><strong>Remarks:</strong> {review.remarks}</div>}
-
-          {isJudge && (!review.outcome || review.outcome === null) && (
-            <form onSubmit={decide} style={{ marginTop: 18, borderTop: '1px solid #e9ecef', paddingTop: 16 }}>
-              <h4>Issue Decision</h4>
-              <div className="form-grid">
-                <div className="form-row"><label>Judge ID</label><input type="number" value={judgeId} onChange={e => setJudgeId(e.target.value)} required /></div>
-                <div className="form-row">
-                  <label>Outcome</label>
-                  <select value={decision.outcome} onChange={e => setDecision({ ...decision, outcome: e.target.value })}>
-                    {REVIEW_OUTCOME.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="form-row"><label>Remarks</label><textarea value={decision.remarks} onChange={e => setDecision({ ...decision, remarks: e.target.value })} /></div>
-              <button className="btn btn-primary">Issue Decision</button>
-            </form>
-          )}
-
-          {isJudge && review.outcome && (
-            <div className="flex-row" style={{ marginTop: 14 }}>
-              <label>Update Outcome:</label>
-              <select value={newOutcome} onChange={e => setNewOutcome(e.target.value)}>
-                <option value="">-- select --</option>
-                {REVIEW_OUTCOME.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-              <button className="btn btn-primary btn-sm" onClick={updateOutcome} disabled={!newOutcome}>Update</button>
+        <div className="card shadow-sm mb-3">
+          <div className="card-body">
+            <h3 className="h5 mb-3">Review</h3>
+            <div className="row g-3">
+              <div className="col-md-6"><strong>Review ID:</strong> #{review.reviewId}</div>
+              <div className="col-md-6"><strong>Judge:</strong> {review.judgeId}</div>
+              <div className="col-md-6"><strong>Date:</strong> {formatDate(review.reviewDate)}</div>
+              <div className="col-md-6"><strong>Outcome:</strong> {review.outcome || '-'}</div>
             </div>
-          )}
+            {review.remarks && <div className="mt-3"><strong>Remarks:</strong> {review.remarks}</div>}
+
+            {isJudge && (!review.outcome || review.outcome === null) && (
+              <form onSubmit={decide} className="border-top pt-3 mt-3">
+                <h4 className="h6 mb-3">Issue Decision</h4>
+                <div className="row g-3">
+                  <div className="col-md-6"><label className="form-label fw-semibold small">Judge ID</label><input className="form-control" type="number" value={judgeId} onChange={e => setJudgeId(e.target.value)} required /></div>
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold small">Outcome</label>
+                    <select className="form-select" value={decision.outcome} onChange={e => setDecision({ ...decision, outcome: e.target.value })}>
+                      {REVIEW_OUTCOME.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-3 mb-3"><label className="form-label fw-semibold small">Remarks</label><textarea className="form-control" value={decision.remarks} onChange={e => setDecision({ ...decision, remarks: e.target.value })} /></div>
+                <button className="btn btn-dark">Issue Decision</button>
+              </form>
+            )}
+
+            {isJudge && review.outcome && (
+              <div className="d-flex gap-2 align-items-center flex-wrap mt-3">
+                <label className="form-label fw-semibold small mb-0">Update Outcome:</label>
+                <select className="form-select form-select-sm w-auto" value={newOutcome} onChange={e => setNewOutcome(e.target.value)}>
+                  <option value="">-- select --</option>
+                  {REVIEW_OUTCOME.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+                <button className="btn btn-dark btn-sm" onClick={updateOutcome} disabled={!newOutcome}>Update</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

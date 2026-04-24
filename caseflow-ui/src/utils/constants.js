@@ -22,13 +22,13 @@ export const CASE_TYPES = ['civil', 'criminal', 'corporate']
 export const LIFECYCLE_MODES = ['auto', 'manual']
 
 export function statusBadgeClass(status) {
-  if (!status) return 'badge-default'
+  if (!status) return 'text-bg-secondary'
   const s = String(status).toUpperCase()
-  if (['ACTIVE', 'VERIFIED', 'PASS', 'COMPLETED', 'DECIDED', 'CLOSED', 'READ', 'DECISION_ISSUED', 'UPHELD'].includes(s)) return 'badge-success'
-  if (['WARNING', 'PENDING', 'UNDER_REVIEW', 'NEEDS_REVIEW', 'SCHEDULED', 'HEARING_SCHEDULED', 'FILED', 'UNREAD', 'RESCHEDULED'].includes(s)) return 'badge-warning'
-  if (['BREACHED', 'REJECTED', 'FAIL', 'CANCELLED', 'SUSPENDED', 'INACTIVE', 'REVERSED', 'APPEALED'].includes(s)) return 'badge-danger'
-  if (['OPEN', 'MODIFIED', 'SENT_BACK'].includes(s)) return 'badge-info'
-  return 'badge-default'
+  if (['ACTIVE', 'VERIFIED', 'PASS', 'COMPLETED', 'DECIDED', 'CLOSED', 'READ', 'DECISION_ISSUED', 'UPHELD'].includes(s)) return 'text-bg-success'
+  if (['WARNING', 'PENDING', 'UNDER_REVIEW', 'NEEDS_REVIEW', 'SCHEDULED', 'HEARING_SCHEDULED', 'FILED', 'UNREAD', 'RESCHEDULED'].includes(s)) return 'text-bg-warning'
+  if (['BREACHED', 'REJECTED', 'FAIL', 'CANCELLED', 'SUSPENDED', 'INACTIVE', 'REVERSED', 'APPEALED'].includes(s)) return 'text-bg-danger'
+  if (['OPEN', 'MODIFIED', 'SENT_BACK'].includes(s)) return 'text-bg-info'
+  return 'text-bg-secondary'
 }
 
 export function formatDate(d) {

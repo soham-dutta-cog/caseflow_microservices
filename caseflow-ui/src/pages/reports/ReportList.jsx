@@ -35,57 +35,65 @@ export default function ReportList() {
 
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">Reports</h1></div>
-      {err && <div className="alert alert-error">{err}</div>}
-      {msg && <div className="alert alert-success">{msg}</div>}
+      <div className="d-flex justify-content-between align-items-center mb-4"><h1 className="page-title h3 mb-0">Reports</h1></div>
+      {err && <div className="alert alert-danger py-2">{err}</div>}
+      {msg && <div className="alert alert-success py-2">{msg}</div>}
 
-      <div className="card">
-        <h3>Generate Report</h3>
-        <form onSubmit={generate}>
-          <div className="form-grid">
-            <div className="form-row"><label>Requested By (user id)</label><input type="number" value={form.requestedBy} onChange={e => setForm({ ...form, requestedBy: e.target.value })} required /></div>
-            <div className="form-row">
-              <label>Scope</label>
-              <select value={form.scope} onChange={e => setForm({ ...form, scope: e.target.value })}>
-                {REPORT_SCOPE.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+      <div className="card shadow-sm mb-3">
+        <div className="card-body">
+          <h3 className="h5 mb-3">Generate Report</h3>
+          <form onSubmit={generate}>
+            <div className="row g-3">
+              <div className="col-md-4"><label className="form-label fw-semibold small">Requested By (user id)</label><input className="form-control" type="number" value={form.requestedBy} onChange={e => setForm({ ...form, requestedBy: e.target.value })} required /></div>
+              <div className="col-md-4">
+                <label className="form-label fw-semibold small">Scope</label>
+                <select className="form-select" value={form.scope} onChange={e => setForm({ ...form, scope: e.target.value })}>
+                  {REPORT_SCOPE.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="col-md-4"><label className="form-label fw-semibold small">Scope Value (id or value for scope)</label><input className="form-control" value={form.scopeValue} onChange={e => setForm({ ...form, scopeValue: e.target.value })} required /></div>
             </div>
-            <div className="form-row"><label>Scope Value (id or value for scope)</label><input value={form.scopeValue} onChange={e => setForm({ ...form, scopeValue: e.target.value })} required /></div>
-          </div>
-          <button className="btn btn-primary">Generate</button>
-        </form>
+            <button className="btn btn-dark mt-3">Generate</button>
+          </form>
+        </div>
       </div>
 
-      <div className="card">
-        <h3>All Reports</h3>
-        {loading ? <div className="empty">Loading...</div> : list.length === 0 ? <div className="empty">No reports</div> : (
-          <table className="table">
-            <thead><tr><th>ID</th><th>Scope</th><th>Value</th><th>Requested By</th><th>Date</th><th></th></tr></thead>
-            <tbody>
-              {list.map(r => (
-                <tr key={r.reportId}>
-                  <td>#{r.reportId}</td>
-                  <td>{r.scope}</td>
-                  <td>{r.scopeValue}</td>
-                  <td>{r.requestedBy}</td>
-                  <td>{formatDate(r.generatedDate)}</td>
-                  <td><button className="btn btn-ghost btn-sm" onClick={() => setSelected(r)}>View</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="card shadow-sm mb-3">
+        <div className="card-body">
+          <h3 className="h5 mb-3">All Reports</h3>
+          {loading ? <div className="text-center text-muted py-4">Loading...</div> : list.length === 0 ? <div className="text-center text-muted py-4">No reports</div> : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light"><tr><th>ID</th><th>Scope</th><th>Value</th><th>Requested By</th><th>Date</th><th></th></tr></thead>
+                <tbody>
+                  {list.map(r => (
+                    <tr key={r.reportId}>
+                      <td>#{r.reportId}</td>
+                      <td>{r.scope}</td>
+                      <td>{r.scopeValue}</td>
+                      <td>{r.requestedBy}</td>
+                      <td>{formatDate(r.generatedDate)}</td>
+                      <td><button className="btn btn-outline-secondary btn-sm" onClick={() => setSelected(r)}>View</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {selected && (
-        <div className="card">
-          <h3>Report #{selected.reportId} Metrics</h3>
-          <pre style={{ background: '#f1f3f5', padding: 12, borderRadius: 6, overflow: 'auto', fontSize: 12 }}>
-            {(() => {
-              try { return JSON.stringify(JSON.parse(selected.metrics), null, 2) } catch { return selected.metrics }
-            })()}
-          </pre>
-          <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>Close</button>
+        <div className="card shadow-sm">
+          <div className="card-body">
+            <h3 className="h5 mb-3">Report #{selected.reportId} Metrics</h3>
+            <pre className="bg-light p-3 rounded small" style={{ overflow: 'auto' }}>
+              {(() => {
+                try { return JSON.stringify(JSON.parse(selected.metrics), null, 2) } catch { return selected.metrics }
+              })()}
+            </pre>
+            <button className="btn btn-outline-secondary btn-sm" onClick={() => setSelected(null)}>Close</button>
+          </div>
         </div>
       )}
     </div>

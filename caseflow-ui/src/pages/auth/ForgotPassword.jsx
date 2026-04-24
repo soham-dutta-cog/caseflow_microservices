@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { auth } from '../../api/services'
+import '../../components/AppLayout.css'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -21,24 +22,26 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>Forgot Password</h1>
-        <p className="muted">Only @gmail.com addresses supported</p>
-        {err && <div className="alert alert-error">{err}</div>}
-        {msg && <div className="alert alert-success">{msg}</div>}
-        <form onSubmit={submit}>
-          <div className="form-row">
-            <label>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+    <div className="auth-page d-flex align-items-center justify-content-center p-3">
+      <div className="auth-card card shadow-lg border-0" style={{ width: '100%', maxWidth: 420 }}>
+        <div className="card-body p-4">
+          <h1 className="h3 mb-1">Forgot Password</h1>
+          <p className="text-muted mb-3">Only @gmail.com addresses supported</p>
+          {err && <div className="alert alert-danger py-2">{err}</div>}
+          {msg && <div className="alert alert-success py-2">{msg}</div>}
+          <form onSubmit={submit}>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Email</label>
+              <input className="form-control" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+            </div>
+            <button className="btn btn-dark w-100" disabled={loading}>
+              {loading ? 'Sending...' : 'Send Reset Link'}
+            </button>
+          </form>
+          <div className="d-flex justify-content-between mt-3 small">
+            <Link to="/login" className="text-decoration-none">Back to sign in</Link>
+            <Link to="/reset-password" className="text-decoration-none">Have a token?</Link>
           </div>
-          <button className="btn btn-primary" disabled={loading} style={{ width: '100%' }}>
-            {loading ? 'Sending...' : 'Send Reset Link'}
-          </button>
-        </form>
-        <div className="links">
-          <Link to="/login">Back to sign in</Link>
-          <Link to="/reset-password">Have a token?</Link>
         </div>
       </div>
     </div>

@@ -28,34 +28,40 @@ export default function ComplianceList() {
 
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">Compliance Records</h1></div>
-      <div className="card">
-        <form onSubmit={loadByCase} className="flex-row">
-          <label>By Case ID:</label>
-          <input type="number" value={caseId} onChange={e => setCaseId(e.target.value)} />
-          <button className="btn btn-primary btn-sm">Load</button>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={loadPaginated}>All</button>
-        </form>
+      <div className="d-flex justify-content-between align-items-center mb-4"><h1 className="page-title h3 mb-0">Compliance Records</h1></div>
+      <div className="card shadow-sm mb-3">
+        <div className="card-body">
+          <form onSubmit={loadByCase} className="d-flex gap-2 align-items-center flex-wrap">
+            <label className="form-label fw-semibold small mb-0">By Case ID:</label>
+            <input className="form-control form-control-sm w-auto" type="number" value={caseId} onChange={e => setCaseId(e.target.value)} />
+            <button className="btn btn-dark btn-sm">Load</button>
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={loadPaginated}>All</button>
+          </form>
+        </div>
       </div>
-      <div className="card">
-        {err && <div className="alert alert-error">{err}</div>}
-        {loading ? <div className="empty">Loading...</div> : records.length === 0 ? <div className="empty">No records</div> : (
-          <table className="table">
-            <thead><tr><th>ID</th><th>Case</th><th>Type</th><th>Result</th><th>Date</th><th>Notes</th></tr></thead>
-            <tbody>
-              {records.map(r => (
-                <tr key={r.complianceId}>
-                  <td>#{r.complianceId}</td>
-                  <td><Link to={`/cases/${r.caseId}`}>#{r.caseId}</Link></td>
-                  <td>{r.type}</td>
-                  <td><span className={`badge-pill ${statusBadgeClass(r.result)}`}>{r.result}</span></td>
-                  <td>{formatDate(r.date)}</td>
-                  <td>{r.notes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="card shadow-sm">
+        <div className="card-body">
+          {err && <div className="alert alert-danger py-2">{err}</div>}
+          {loading ? <div className="text-center text-muted py-4">Loading...</div> : records.length === 0 ? <div className="text-center text-muted py-4">No records</div> : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light"><tr><th>ID</th><th>Case</th><th>Type</th><th>Result</th><th>Date</th><th>Notes</th></tr></thead>
+                <tbody>
+                  {records.map(r => (
+                    <tr key={r.complianceId}>
+                      <td>#{r.complianceId}</td>
+                      <td><Link to={`/cases/${r.caseId}`}>#{r.caseId}</Link></td>
+                      <td>{r.type}</td>
+                      <td><span className={`badge rounded-pill ${statusBadgeClass(r.result)}`}>{r.result}</span></td>
+                      <td>{formatDate(r.date)}</td>
+                      <td>{r.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

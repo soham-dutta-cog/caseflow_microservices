@@ -1,5 +1,8 @@
 /* ===== CASEFLOW DESIGN SYSTEM ===== */
-/* All team members: import this file and use these variables for consistency */
+/* Design tokens + brand-specific custom classes. Bootstrap 5.3.3 is loaded
+   globally via CDN in index.html — prefer Bootstrap utilities for layout,
+   spacing, flex/grid, buttons, cards, forms. Keep this file focused on
+   tokens + genuinely custom visuals. */
 
 :root {
   /* Primary palette — deep navy & warm gold */
@@ -79,12 +82,6 @@
 }
 
 /* ===== RESET & BASE ===== */
-*, *::before, *::after {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
@@ -104,25 +101,12 @@ a {
   color: inherit;
 }
 
-button {
-  font-family: var(--font-body);
-  cursor: pointer;
-  border: none;
-  background: none;
-}
-
 img {
   max-width: 100%;
   display: block;
 }
 
-/* ===== UTILITY CLASSES (for team use) ===== */
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 var(--space-lg);
-}
-
+/* ===== BRAND CUSTOM CLASSES ===== */
 .section {
   padding: var(--space-4xl) 0;
 }
@@ -134,47 +118,70 @@ img {
   background-clip: text;
 }
 
-/* ===== BUTTON SYSTEM ===== */
-.btn {
+/* Gold pill button — brand signature CTA.
+   Bootstrap's btn-warning doesn't give us the gradient/glow we need. */
+.btn-gold {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-sm);
   padding: 12px 28px;
   border-radius: var(--radius-full);
   font-weight: 600;
   font-size: 14px;
   letter-spacing: 0.02em;
-  transition: all var(--duration-normal) var(--ease-out);
-}
-
-.btn-primary {
+  border: none;
   background: linear-gradient(135deg, var(--cf-gold-500), var(--cf-gold-400));
   color: var(--cf-navy-950);
   box-shadow: 0 2px 12px rgba(201, 168, 76, 0.3);
+  transition: all var(--duration-normal) var(--ease-out);
+  cursor: pointer;
 }
-.btn-primary:hover {
+.btn-gold:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(201, 168, 76, 0.4);
+  color: var(--cf-navy-950);
+}
+.btn-gold.btn-lg {
+  padding: 16px 36px;
+  font-size: 15px;
 }
 
-.btn-secondary {
-  background: transparent;
-  color: var(--cf-white);
-  border: 1.5px solid rgba(255, 255, 255, 0.25);
-}
-.btn-secondary:hover {
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.05);
+/* Semantic section labels used across landing pages */
+.section-label {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-gold-500);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 16px;
 }
 
-.btn-dark {
-  background: var(--cf-navy-900);
-  color: var(--cf-white);
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 3.6vw, 44px);
+  font-weight: 600;
+  color: var(--cf-navy-900);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
 }
-.btn-dark:hover {
-  background: var(--cf-navy-800);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+
+.section-subtitle {
+  font-size: 16px;
+  color: var(--cf-gray-600);
+  line-height: 1.7;
+  max-width: 640px;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.section-header .section-subtitle {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ===== ANIMATIONS ===== */

@@ -35,31 +35,37 @@ export default function PendingDocuments() {
 
   return (
     <div>
-      <div className="page-header"><h1 className="page-title">Pending Documents</h1></div>
-      {err && <div className="alert alert-error">{err}</div>}
-      {msg && <div className="alert alert-success">{msg}</div>}
-      <div className="card">
-        {loading ? <div className="empty">Loading...</div> : docs.length === 0 ? <div className="empty">Nothing pending</div> : (
-          <table className="table">
-            <thead><tr><th>ID</th><th>Case</th><th>Title</th><th>Type</th><th>Uploaded</th><th>By</th><th>Actions</th></tr></thead>
-            <tbody>
-              {docs.map(d => (
-                <tr key={d.documentId}>
-                  <td>#{d.documentId}</td>
-                  <td><Link to={`/cases/${d.caseId}`}>#{d.caseId}</Link></td>
-                  <td>{d.title}</td>
-                  <td>{d.type}</td>
-                  <td>{formatDate(d.uploadedDate)}</td>
-                  <td>{d.uploadedBy}</td>
-                  <td className="row-actions">
-                    <button className="btn btn-primary btn-sm" onClick={() => verify(d, 'VERIFIED')}>Verify</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => verify(d, 'REJECTED')}>Reject</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <div className="d-flex justify-content-between align-items-center mb-4"><h1 className="page-title h3 mb-0">Pending Documents</h1></div>
+      {err && <div className="alert alert-danger py-2">{err}</div>}
+      {msg && <div className="alert alert-success py-2">{msg}</div>}
+      <div className="card shadow-sm">
+        <div className="card-body">
+          {loading ? <div className="text-center text-muted py-4">Loading...</div> : docs.length === 0 ? <div className="text-center text-muted py-4">Nothing pending</div> : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle">
+                <thead className="table-light"><tr><th>ID</th><th>Case</th><th>Title</th><th>Type</th><th>Uploaded</th><th>By</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {docs.map(d => (
+                    <tr key={d.documentId}>
+                      <td>#{d.documentId}</td>
+                      <td><Link to={`/cases/${d.caseId}`}>#{d.caseId}</Link></td>
+                      <td>{d.title}</td>
+                      <td>{d.type}</td>
+                      <td>{formatDate(d.uploadedDate)}</td>
+                      <td>{d.uploadedBy}</td>
+                      <td>
+                        <div className="d-flex gap-2 flex-wrap">
+                          <button className="btn btn-dark btn-sm" onClick={() => verify(d, 'VERIFIED')}>Verify</button>
+                          <button className="btn btn-danger btn-sm" onClick={() => verify(d, 'REJECTED')}>Reject</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

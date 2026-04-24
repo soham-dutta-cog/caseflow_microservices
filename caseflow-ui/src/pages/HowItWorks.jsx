@@ -1,5 +1,3 @@
-import './HowItWorks.css'
-
 const steps = [
   { num: '1', title: 'Case Filing', desc: 'A litigant or lawyer files a new case through the Case module. Documents are uploaded and queued for verification.', service: 'case-service → iam-service' },
   { num: '2', title: 'Workflow Initialization', desc: 'Once all documents are verified, the Workflow engine auto-initializes lifecycle stages with SLA deadlines for the case.', service: 'workflow-service → case-service' },
@@ -11,28 +9,28 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <main className="hiw-page">
-      <section className="hiw-hero">
+    <main>
+      <section className="text-center text-white" style={{ background: 'var(--cf-navy-950)', padding: '160px 0 80px' }}>
         <div className="container">
           <span className="section-label">How It Works</span>
-          <h1 className="hiw-hero__title">From filing to resolution — <br />every step automated.</h1>
-          <p className="hiw-hero__sub">Follow a case through the entire CaseFlow platform to see how all 8 microservices work together.</p>
+          <h1 className="mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 5vw, 50px)', fontWeight: 600, lineHeight: 1.15 }}>From filing to resolution — <br />every step automated.</h1>
+          <p className="fs-5 mx-auto mb-0" style={{ maxWidth: 560, color: 'rgba(255,255,255,0.5)' }}>Follow a case through the entire CaseFlow platform to see how all 8 microservices work together.</p>
         </div>
       </section>
 
       <section className="hiw-steps section">
         <div className="container">
-          <div className="hiw-timeline">
+          <div className="mx-auto" style={{ maxWidth: 680 }}>
             {steps.map((step, i) => (
-              <div key={i} className="hiw-step">
-                <div className="hiw-step__marker">
-                  <span className="hiw-step__num">{step.num}</span>
-                  {i < steps.length - 1 && <div className="hiw-step__line" />}
+              <div key={i} className="d-flex gap-3 gap-md-4 position-relative">
+                <div className="d-flex flex-column align-items-center flex-shrink-0">
+                  <span className="d-flex align-items-center justify-content-center rounded-circle fw-bold" style={{ width: 44, height: 44, background: 'var(--cf-navy-900)', color: 'var(--cf-gold-400)', fontFamily: 'var(--font-display)', fontSize: 18 }}>{step.num}</span>
+                  {i < steps.length - 1 && <div className="flex-grow-1 my-2" style={{ width: 2, background: 'var(--cf-gray-200)' }} />}
                 </div>
-                <div className="hiw-step__content">
-                  <h3 className="hiw-step__title">{step.title}</h3>
-                  <p className="hiw-step__desc">{step.desc}</p>
-                  <span className="hiw-step__service">{step.service}</span>
+                <div className="pb-5">
+                  <h3 className="h5 fw-bold text-dark mb-2">{step.title}</h3>
+                  <p className="text-secondary mb-2" style={{ lineHeight: 1.7 }}>{step.desc}</p>
+                  <span className="d-inline-block px-3 py-1 rounded-pill fw-semibold" style={{ background: 'var(--cf-navy-50)', color: 'var(--cf-navy-600)', fontSize: 12, fontFamily: 'monospace' }}>{step.service}</span>
                 </div>
               </div>
             ))}

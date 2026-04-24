@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { auth } from '../../api/services'
+import '../../components/AppLayout.css'
 
 export default function ResetPassword() {
   const [params] = useSearchParams()
@@ -31,31 +32,33 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <h1>Reset Password</h1>
-        <p className="muted">Enter the token from your email</p>
-        {err && <div className="alert alert-error">{err}</div>}
-        {msg && <div className="alert alert-success">{msg}</div>}
-        <form onSubmit={submit}>
-          <div className="form-row">
-            <label>Token</label>
-            <input value={form.token} onChange={upd('token')} required />
+    <div className="auth-page d-flex align-items-center justify-content-center p-3">
+      <div className="auth-card card shadow-lg border-0" style={{ width: '100%', maxWidth: 420 }}>
+        <div className="card-body p-4">
+          <h1 className="h3 mb-1">Reset Password</h1>
+          <p className="text-muted mb-3">Enter the token from your email</p>
+          {err && <div className="alert alert-danger py-2">{err}</div>}
+          {msg && <div className="alert alert-success py-2">{msg}</div>}
+          <form onSubmit={submit}>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Token</label>
+              <input className="form-control" value={form.token} onChange={upd('token')} required />
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">New Password</label>
+              <input className="form-control" type="password" minLength={6} value={form.newPassword} onChange={upd('newPassword')} required />
+            </div>
+            <div className="mb-3">
+              <label className="form-label fw-semibold small">Confirm Password</label>
+              <input className="form-control" type="password" minLength={6} value={form.confirmPassword} onChange={upd('confirmPassword')} required />
+            </div>
+            <button className="btn btn-dark w-100" disabled={loading}>
+              {loading ? 'Resetting...' : 'Reset Password'}
+            </button>
+          </form>
+          <div className="mt-3 small">
+            <Link to="/login" className="text-decoration-none">Back to sign in</Link>
           </div>
-          <div className="form-row">
-            <label>New Password</label>
-            <input type="password" minLength={6} value={form.newPassword} onChange={upd('newPassword')} required />
-          </div>
-          <div className="form-row">
-            <label>Confirm Password</label>
-            <input type="password" minLength={6} value={form.confirmPassword} onChange={upd('confirmPassword')} required />
-          </div>
-          <button className="btn btn-primary" disabled={loading} style={{ width: '100%' }}>
-            {loading ? 'Resetting...' : 'Reset Password'}
-          </button>
-        </form>
-        <div className="links">
-          <Link to="/login">Back to sign in</Link>
         </div>
       </div>
     </div>

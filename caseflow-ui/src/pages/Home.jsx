@@ -151,19 +151,19 @@ export default function Home() {
           <div className="hero__orb hero__orb--2" />
           <div className="hero__orb hero__orb--3" />
         </div>
-        <div className="container hero__content">
+        <div className="container hero__content text-center">
           <h1 className="hero__title animate-in animate-in-delay-1">
             The future of legal<br />case management is&nbsp;
             <span className="text-gradient">here.</span>
           </h1>
-          <p className="hero__subtitle animate-in animate-in-delay-2">
+          <p className="hero__subtitle animate-in animate-in-delay-2 mx-auto">
             CaseFlow replaces fragmented paper-based legal systems with a single, intelligent platform
             that automates case filing, hearing scheduling, deadline tracking, compliance checks, and reporting —
             so legal teams can focus on justice, not paperwork.
           </p>
-          <div className="hero__actions animate-in animate-in-delay-3">
-            <Link to="/login" className="btn btn-primary btn-lg">Get Started Free</Link>
-            <a href="#modules" className="btn btn-secondary">Explore Modules</a>
+          <div className="animate-in animate-in-delay-3 d-flex flex-column flex-sm-row gap-3 justify-content-center mb-5">
+            <Link to="/login" className="btn btn-gold btn-lg">Get Started Free</Link>
+            <a href="#modules" className="btn btn-outline-light rounded-pill">Explore Modules</a>
           </div>
 
           <div className="hero__metrics animate-in animate-in-delay-4">
@@ -183,20 +183,24 @@ export default function Home() {
       {/* ===== BRAND STORY ===== */}
       <section className="brand section">
         <div className="container">
-          <div className="brand__grid">
-            <Reveal>
-              <div className="brand__left">
-                <span className="section-label">Why CaseFlow?</span>
-                <h2 className="section-title">Courts shouldn't run on spreadsheets and sticky notes.</h2>
-              </div>
-            </Reveal>
-            <Reveal delay={200}>
-              <div className="brand__right">
-                <p>Every year, thousands of legal cases are delayed, mismanaged, or lost in bureaucratic chaos — not because of bad lawyers or judges, but because of outdated systems that were never designed for the complexity of modern legal operations.</p>
-                <p>CaseFlow changes that. We built a platform from the ground up, using microservices architecture and cloud-native technology, to handle every stage of a legal case — from the moment it is filed to its final resolution. Every deadline tracked. Every document verified. Every stakeholder notified. Automatically.</p>
-                <p className="brand__highlight">This isn't just digitization. It's a complete rethink of how legal workflows should operate in 2026.</p>
-              </div>
-            </Reveal>
+          <div className="row g-5 align-items-start">
+            <div className="col-12 col-lg-5">
+              <Reveal>
+                <div>
+                  <span className="section-label">Why CaseFlow?</span>
+                  <h2 className="section-title">Courts shouldn't run on spreadsheets and sticky notes.</h2>
+                </div>
+              </Reveal>
+            </div>
+            <div className="col-12 col-lg-7">
+              <Reveal delay={200}>
+                <div className="text-secondary" style={{ lineHeight: 1.8 }}>
+                  <p className="mb-3">Every year, thousands of legal cases are delayed, mismanaged, or lost in bureaucratic chaos — not because of bad lawyers or judges, but because of outdated systems that were never designed for the complexity of modern legal operations.</p>
+                  <p className="mb-3">CaseFlow changes that. We built a platform from the ground up, using microservices architecture and cloud-native technology, to handle every stage of a legal case — from the moment it is filed to its final resolution. Every deadline tracked. Every document verified. Every stakeholder notified. Automatically.</p>
+                  <p className="brand__highlight fs-6 mb-0">This isn't just digitization. It's a complete rethink of how legal workflows should operate in 2026.</p>
+                </div>
+              </Reveal>
+            </div>
           </div>
         </div>
       </section>
@@ -210,15 +214,17 @@ export default function Home() {
               <h2 className="section-title">Six reasons legal teams choose CaseFlow.</h2>
             </div>
           </Reveal>
-          <div className="why__grid">
+          <div className="row g-3">
             {whyCards.map((card, i) => (
-              <Reveal key={i} delay={i * 80}>
-                <div className="why-card">
-                  <span className="why-card__icon">{card.icon}</span>
-                  <h3 className="why-card__title">{card.title}</h3>
-                  <p className="why-card__desc">{card.desc}</p>
-                </div>
-              </Reveal>
+              <div key={i} className="col-12 col-md-6 col-lg-4">
+                <Reveal delay={i * 80}>
+                  <div className="why-card h-100 p-4 rounded-3">
+                    <span className="d-block mb-3" style={{ fontSize: 28 }}>{card.icon}</span>
+                    <h3 className="h6 fw-bold text-dark mb-2">{card.title}</h3>
+                    <p className="small text-secondary mb-0" style={{ lineHeight: 1.7 }}>{card.desc}</p>
+                  </div>
+                </Reveal>
+              </div>
             ))}
           </div>
         </div>
@@ -236,7 +242,7 @@ export default function Home() {
           </Reveal>
 
           {/* Module selector tabs */}
-          <div className="mod-tabs">
+          <div className="mod-tabs d-flex flex-wrap justify-content-center">
             {modules.map((mod, i) => (
               <button
                 key={i}
@@ -244,7 +250,7 @@ export default function Home() {
                 onClick={() => setActiveModule(i)}
                 style={{ '--tab-color': mod.color }}
               >
-                <span className="mod-tab__icon">{mod.icon}</span>
+                <span className="fs-6">{mod.icon}</span>
                 <span className="mod-tab__title">{mod.title.split(' ')[0]}</span>
               </button>
             ))}
@@ -252,85 +258,95 @@ export default function Home() {
 
           {/* Active module detail */}
           <div className="mod-detail" key={activeModule}>
-            <div className="mod-detail__header">
+            <div className="text-center text-md-start">
               <span className="mod-detail__tag" style={{ background: modules[activeModule].color }}>{modules[activeModule].tag}</span>
               <h3 className="mod-detail__title">{modules[activeModule].title}</h3>
               <p className="mod-detail__headline">{modules[activeModule].headline}</p>
             </div>
-            <div className="mod-detail__body">
-              <div className="mod-detail__desc">
-                <p>{modules[activeModule].desc}</p>
-                <div className="mod-detail__stat">
-                  <span className="mod-detail__stat-number">{modules[activeModule].stat}</span>
-                  <span className="mod-detail__stat-label">{modules[activeModule].statLabel}</span>
+            <div className="row g-4">
+              <div className="col-12 col-lg-7">
+                <div>
+                  <p className="text-secondary mb-4" style={{ fontSize: 15, lineHeight: 1.8 }}>{modules[activeModule].desc}</p>
+                  <div className="mod-detail__stat">
+                    <span className="mod-detail__stat-number">{modules[activeModule].stat}</span>
+                    <span className="small fw-medium text-secondary">{modules[activeModule].statLabel}</span>
+                  </div>
                 </div>
               </div>
-              <div className="mod-detail__features">
-                <h4>Key Capabilities</h4>
-                <ul>
-                  {modules[activeModule].features.map((f, j) => (
-                    <li key={j}><span className="mod-feature__check" style={{ color: modules[activeModule].color }}>✓</span> {f}</li>
-                  ))}
-                </ul>
+              <div className="col-12 col-lg-5">
+                <div className="mod-detail__features">
+                  <h4>Key Capabilities</h4>
+                  <ul>
+                    {modules[activeModule].features.map((f, j) => (
+                      <li key={j}><span className="fw-bold" style={{ color: modules[activeModule].color, fontSize: 16 }}>✓</span> {f}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Quick-access cards */}
-          <div className="mod-cards">
+          <div className="row g-2">
             {modules.map((mod, i) => (
-              <Reveal key={i} delay={i * 60}>
-                <button className="mod-mini-card" onClick={() => { setActiveModule(i); document.getElementById('modules').scrollIntoView({ behavior: 'smooth' }) }} style={{ '--accent': mod.color }}>
-                  <span className="mod-mini-card__icon">{mod.icon}</span>
-                  <span className="mod-mini-card__title">{mod.title}</span>
-                  <span className="mod-mini-card__arrow">→</span>
-                </button>
-              </Reveal>
+              <div key={i} className="col-12 col-md-6 col-lg-3">
+                <Reveal delay={i * 60}>
+                  <button className="mod-mini-card w-100" onClick={() => { setActiveModule(i); document.getElementById('modules').scrollIntoView({ behavior: 'smooth' }) }} style={{ '--accent': mod.color }}>
+                    <span className="fs-5">{mod.icon}</span>
+                    <span className="mod-mini-card__title">{mod.title}</span>
+                    <span className="mod-mini-card__arrow">→</span>
+                  </button>
+                </Reveal>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      
+
       {/* ===== ARCHITECTURE ===== */}
       <section className="arch section">
         <div className="container">
-          <div className="arch__inner">
-            <Reveal>
-              <div className="arch__text">
-                <span className="section-label">Architecture</span>
-                <h2 className="section-title" style={{ color: 'var(--cf-white)' }}>Built on microservices.<br />Designed for resilience.</h2>
-                <p className="arch__desc">Every request flows through the API Gateway, authenticated via JWT, routed by Eureka service discovery, and protected by Resilience4j circuit breakers. If one service goes down, the rest keep running with graceful fallbacks.</p>
-                <div className="arch__features">
-                  <div className="arch__feature"><span className="arch__feature-icon">🛡</span> API Gateway routing</div>
-                  <div className="arch__feature"><span className="arch__feature-icon">🔍</span> Eureka service discovery</div>
-                  <div className="arch__feature"><span className="arch__feature-icon">⚡</span> Circuit breaker fallbacks</div>
-                  <div className="arch__feature"><span className="arch__feature-icon">🗄</span> Database per service</div>
-                  <div className="arch__feature"><span className="arch__feature-icon">⚙</span> Centralized config server</div>
-                  <div className="arch__feature"><span className="arch__feature-icon">🔐</span> JWT at gateway level</div>
+          <div className="row g-5 align-items-center">
+            <div className="col-12 col-lg-6">
+              <Reveal>
+                <div>
+                  <span className="section-label">Architecture</span>
+                  <h2 className="section-title text-white">Built on microservices.<br />Designed for resilience.</h2>
+                  <p className="arch__desc fs-6 mb-4" style={{ lineHeight: 1.7 }}>Every request flows through the API Gateway, authenticated via JWT, routed by Eureka service discovery, and protected by Resilience4j circuit breakers. If one service goes down, the rest keep running with graceful fallbacks.</p>
+                  <div className="row g-3">
+                    <div className="col-6 arch__feature"><span className="fs-6">🛡</span> API Gateway routing</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">🔍</span> Eureka service discovery</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">⚡</span> Circuit breaker fallbacks</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">🗄</span> Database per service</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">⚙</span> Centralized config server</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">🔐</span> JWT at gateway level</div>
+                  </div>
                 </div>
-              </div>
-            </Reveal>
-            <Reveal delay={200}>
-              <div className="arch__visual">
-                <div className="arch__node arch__node--gateway">API Gateway<span>:8085</span></div>
-                <div className="arch__connector" />
-                <div className="arch__services">
-                  {['IAM', 'Cases', 'Workflow', 'Hearing'].map((s, i) => (
-                    <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 1}</span></div>
-                  ))}
+              </Reveal>
+            </div>
+            <div className="col-12 col-lg-6">
+              <Reveal delay={200}>
+                <div className="arch__visual">
+                  <div className="arch__node arch__node--gateway">API Gateway<span>:8085</span></div>
+                  <div className="arch__connector" />
+                  <div className="arch__services">
+                    {['IAM', 'Cases', 'Workflow', 'Hearing'].map((s, i) => (
+                      <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 1}</span></div>
+                    ))}
+                  </div>
+                  <div className="arch__services">
+                    {['Appeals', 'Compliance', 'Notifications', 'Reports'].map((s, i) => (
+                      <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 6}</span></div>
+                    ))}
+                  </div>
+                  <div className="arch__infra">
+                    <div className="arch__node arch__node--infra">Eureka<span>:8761</span></div>
+                    <div className="arch__node arch__node--infra">Config Server<span>:8888</span></div>
+                  </div>
                 </div>
-                <div className="arch__services">
-                  {['Appeals', 'Compliance', 'Notifications', 'Reports'].map((s, i) => (
-                    <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 6}</span></div>
-                  ))}
-                </div>
-                <div className="arch__infra">
-                  <div className="arch__node arch__node--infra">Eureka<span>:8761</span></div>
-                  <div className="arch__node arch__node--infra">Config Server<span>:8888</span></div>
-                </div>
-              </div>
-            </Reveal>
+              </Reveal>
+            </div>
           </div>
         </div>
       </section>
@@ -344,18 +360,20 @@ export default function Home() {
               <h2 className="section-title">Powered by modern Java<br />and cloud-native tools.</h2>
             </div>
           </Reveal>
-          <div className="tech__grid">
+          <div className="row g-4">
             {techStack.map((group, i) => (
-              <Reveal key={i} delay={i * 120}>
-                <div className="tech__card">
-                  <h3 className="tech__card-title">{group.category}</h3>
-                  <ul className="tech__list">
-                    {group.items.map((item, j) => (
-                      <li key={j} className="tech__item"><span className="tech__item-dot" />{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              </Reveal>
+              <div key={i} className="col-12 col-md-6 col-lg-4">
+                <Reveal delay={i * 120}>
+                  <div className="tech__card h-100 p-4 rounded-3">
+                    <h3 className="tech__card-title">{group.category}</h3>
+                    <ul className="tech__list list-unstyled mb-0">
+                      {group.items.map((item, j) => (
+                        <li key={j} className="tech__item"><span className="tech__item-dot" />{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </Reveal>
+              </div>
             ))}
           </div>
         </div>
@@ -371,15 +389,17 @@ export default function Home() {
               <p className="section-subtitle">Each team member owns an independent microservice end-to-end — from database design to REST API to frontend interface.</p>
             </div>
           </Reveal>
-          <div className="team__grid">
+          <div className="row g-3">
             {team.map((member, i) => (
-              <Reveal key={i} delay={i * 60}>
-                <div className="team-card">
-                  <div className="team-card__avatar">{member.avatar}</div>
-                  <h4 className="team-card__name">{member.name}</h4>
-                  <p className="team-card__role">{member.role}</p>
-                </div>
-              </Reveal>
+              <div key={i} className="col-12 col-sm-6 col-lg-3">
+                <Reveal delay={i * 60}>
+                  <div className="team-card text-center p-4 rounded-3 h-100">
+                    <div className="team-card__avatar mx-auto">{member.avatar}</div>
+                    <h4 className="fw-semibold text-dark mb-1" style={{ fontSize: 15 }}>{member.name}</h4>
+                    <p className="small text-secondary mb-0">{member.role}</p>
+                  </div>
+                </Reveal>
+              </div>
             ))}
           </div>
         </div>
@@ -389,12 +409,12 @@ export default function Home() {
       <section className="cta section">
         <div className="container">
           <Reveal>
-            <div className="cta__inner">
+            <div className="cta__inner text-center">
               <h2 className="cta__title">Ready to see CaseFlow in action?</h2>
-              <p className="cta__desc">Sign in to explore the platform, manage cases, track deadlines, and experience the future of legal operations.</p>
-              <div className="cta__actions">
-                <Link to="/login" className="btn btn-primary btn-lg">Get Started</Link>
-                <Link to="/how-it-works" className="btn btn-dark">Read the Docs</Link>
+              <p className="cta__desc fs-6 mx-auto">Sign in to explore the platform, manage cases, track deadlines, and experience the future of legal operations.</p>
+              <div className="cta__actions d-flex flex-column flex-sm-row gap-3 justify-content-center">
+                <Link to="/login" className="btn btn-gold btn-lg">Get Started</Link>
+                <Link to="/how-it-works" className="btn btn-dark rounded-pill">Read the Docs</Link>
               </div>
             </div>
           </Reveal>
