@@ -23,6 +23,7 @@ class UserServiceTest {
     @Mock private AuthenticationManager authenticationManager;
     @Mock private AuditLogService auditLogService;
     @Mock private TokenBlacklistService tokenBlacklistService;
+    @Mock private EmailService emailService;
     @InjectMocks private UserService userService;
 
     @Test void getUserById_found() {
@@ -49,5 +50,28 @@ class UserServiceTest {
     @Test void existsById_true() {
         when(userRepository.existsById("TES_ADMIN_1")).thenReturn(true);
         assertTrue(userService.existsById("TES_ADMIN_1"));
+    }
+
+    @Test void registerLitigant_sendsEmailWithUserId() {
+        UserRequest req = new UserRequest();
+        req.setEmail("litigant@gmail.com");
+        req.setName("Liti");
+        req.setPhone("1234567890");
+        req.setPassword("pass123");
+
+        when(userRepository.existsByEmail("litigant@gmail.com")).thenReturn(false);
+        when(userRepository.countByRole(User.Role.LITIGANT)).thenReturn(0L);
+        when(userRepository.existsById("LIT_LITIGANT_1")).thenReturn(false);
+        when(passwordEncoder.encode("pass123")).thenReturn("encoded-pass");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.registerLitigant(req);
+
+        assertEquals("LIT_LITIGANT_1", response.getUserId());
+        verify(emailService).sendEmail(
+                eq("litigant@gmail.com"),
+                eq("Your CaseFlow Account Has Been Created"),
+                argThat(body -> body != null && body.contains("LIT_LITIGANT_1"))
+        );
     }
 }

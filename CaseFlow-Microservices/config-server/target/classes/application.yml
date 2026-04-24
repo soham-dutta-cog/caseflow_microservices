@@ -8,12 +8,12 @@ spring:
     config:
       server:
         git:
-          uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
-          default-label: soham-config
+          uri: https://github.com/varun-2s/caseflow_config_server.git
+          default-label: main
           clone-on-start: true
           skip-ssl-validation: true
-          username: soham-dutta-cog
-          password: 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
+          username: varun-2s
+          password: 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
 
 eureka:
   client:
