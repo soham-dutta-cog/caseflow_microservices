@@ -27,7 +27,14 @@ public class UserService {
 
     public UserResponse registerLitigant(UserRequest request) {
         request.setRole(User.Role.LITIGANT);
-        return register(request);
+        UserResponse response = register(request);
+        try {
+            sendLitigantRegistrationEmail(response.getEmail(), response.getName(), response.getUserId());
+        } catch (RuntimeException ex) {
+            // Keep registration successful even when mail provider is temporarily unavailable.
+            log.warn("Litigant registered but confirmation email could not be sent to {}", response.getEmail(), ex);
+        }
+        return response;
     }
 
     public UserResponse createUserByAdmin(UserRequest request) {
@@ -49,6 +56,17 @@ public class UserService {
                 + "  Email:    " + email + "\n"
                 + "  Password: " + rawPassword + "\n\n"
                 + "IMPORTANT: Please change your password after your first login.\n\n"
+                + "Regards,\n"
+                + "CaseFlow Admin";
+        emailService.sendEmail(email, subject, body);
+    }
+
+    private void sendLitigantRegistrationEmail(String email, String name, String userId) {
+        String subject = "Your CaseFlow Account Has Been Created";
+        String body = "Dear " + name + ",\n\n"
+                + "Your CaseFlow account has been successfully created.\n\n"
+                + "Your User ID is: " + userId + "\n\n"
+                + "Please use this User ID for future support and communication.\n\n"
                 + "Regards,\n"
                 + "CaseFlow Admin";
         emailService.sendEmail(email, subject, body);
