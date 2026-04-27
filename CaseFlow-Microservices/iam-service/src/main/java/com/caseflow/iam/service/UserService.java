@@ -102,7 +102,7 @@ public class UserService {
             throw new BadRequestException("Only @gmail.com email addresses are allowed for non-admin users");
         if (user.getStatus() == User.Status.INACTIVE)
             throw new InvalidOperationException("User account is inactive");
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getUserId());
         auditLogService.log(user.getUserId(), "USER_LOGIN", "User:" + user.getUserId());
         return new LoginResponse(token, user.getRole().name(), user.getName(), user.getEmail());
     }
