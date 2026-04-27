@@ -95,7 +95,24 @@
   border-radius: var(--radius-xl);
   backdrop-filter: blur(10px);
 }
+.hero__metrics--vertical {
+  flex-direction: column;
+  gap: 20px;
+  align-items: stretch;
+  padding: 28px 32px;
+}
 .hero__metric { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.hero__metric--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.hero__metric--row:last-child { border-bottom: none; padding-bottom: 0; }
+.hero__metric--row .hero__metric-number { font-size: 32px; }
+.hero__metric--row .hero__metric-label { text-align: right; }
 .hero__metric-number {
   font-family: var(--font-display);
   font-size: 40px;

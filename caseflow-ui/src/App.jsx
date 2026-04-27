@@ -87,8 +87,8 @@ function App() {
             <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK','ADMIN']}><JudgeSlots /></ProtectedRoute>} />
             <Route path="/hearings/:hearingId" element={<HearingDetail />} />
 
-            <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK','JUDGE']}><WorkflowDashboard /></ProtectedRoute>} />
-            <Route path="/workflow/:caseId" element={<CaseWorkflow />} />
+            <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
+            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
 
             <Route path="/appeals" element={<AppealList />} />
             <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER']}><FileAppeal /></ProtectedRoute>} />

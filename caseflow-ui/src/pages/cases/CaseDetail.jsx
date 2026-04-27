@@ -112,7 +112,7 @@ export default function CaseDetail() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="page-title h3 mb-0">Case #{c.caseId}: {c.title}</h1>
         <div className="d-flex gap-2 flex-wrap">
-          <Link to={`/workflow/${c.caseId}`} className="btn btn-outline-secondary btn-sm">Workflow</Link>
+          {['ADMIN','CLERK'].includes(user?.role) && <Link to={`/workflow/${c.caseId}`} className="btn btn-outline-secondary btn-sm">Workflow</Link>}
           <Link to={`/appeals/file?caseId=${c.caseId}`} className="btn btn-outline-secondary btn-sm">File Appeal</Link>
         </div>
       </div>
@@ -237,7 +237,7 @@ export default function CaseDetail() {
             <div className="wf-init-empty">
               <div className="wf-init-empty-icon">⚙️</div>
               <p>No workflow has been initialized for this case yet.</p>
-              <Link to={`/workflow/${c.caseId}`} className="wf-init-link">🚀 Initialize Workflow</Link>
+              {['ADMIN','CLERK'].includes(user?.role) && <Link to={`/workflow/${c.caseId}`} className="wf-init-link">Initialize Workflow</Link>}
             </div>
           ) : (
             <div className="table-responsive">
