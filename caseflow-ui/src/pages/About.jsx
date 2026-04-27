@@ -1,11 +1,25 @@
 export default function About() {
   return (
     <main>
-      <section className="text-center text-white" style={{ background: 'var(--cf-navy-950)', padding: '160px 0 80px' }}>
+      <section className="text-white" style={{ background: 'var(--cf-navy-950)', padding: '160px 0 80px' }}>
         <div className="container">
-          <span className="section-label">About CaseFlow</span>
-          <h1 className="mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 5vw, 50px)', fontWeight: 600, lineHeight: 1.15 }}>Bringing legal case management <br />into the modern era.</h1>
-          <p className="fs-5 mx-auto mb-0" style={{ maxWidth: 620, color: 'rgba(255,255,255,0.5)' }}>CaseFlow is a full-stack microservices application developed by a team of 8 interns at Cognizant during the 2026 internship program, specializing in Full Stack Java with React.</p>
+          <div className="row align-items-center">
+            <div className="col-lg-7">
+              <span className="section-label">About CaseFlow</span>
+              <h1 className="mb-3" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 5vw, 50px)', fontWeight: 600, lineHeight: 1.15 }}>Bringing legal case management into the modern era.</h1>
+              <p className="fs-5 mb-0" style={{ maxWidth: 580, color: 'rgba(255,255,255,0.5)' }}>CaseFlow is a full-stack microservices application developed by a team of 8 interns at Cognizant during the 2026 internship program, specializing in Full Stack Java with React.</p>
+            </div>
+            <div className="col-lg-5 d-none d-lg-flex justify-content-center">
+              <div className="d-flex flex-column gap-3 text-center">
+                {[{n:'8', l:'Services'},{n:'11', l:'Cloud Components'},{n:'50+', l:'Endpoints'}].map((s,i) => (
+                  <div key={i} className="px-4 py-3 rounded-3" style={{background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)'}}>
+                    <div style={{fontFamily:'var(--font-display)', fontSize:28, fontWeight:700, color:'var(--cf-gold-400)'}}>{s.n}</div>
+                    <div style={{fontSize:12, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.08em'}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
