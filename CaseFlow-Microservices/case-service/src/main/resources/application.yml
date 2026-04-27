@@ -3,3 +3,10 @@ spring:
     name: case-service
   config:
     import: optional:configserver:http://localhost:8888
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
