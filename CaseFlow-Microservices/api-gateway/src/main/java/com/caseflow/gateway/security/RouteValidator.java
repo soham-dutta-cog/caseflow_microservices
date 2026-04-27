@@ -26,7 +26,16 @@ public class RouteValidator {
             "/swagger-ui.html",
             "/v3/api-docs",
             "/api-docs",
-            "/actuator"
+            "/actuator",
+            // Per-service Swagger doc proxy paths (routed through gateway with StripPrefix=1)
+            "/iam/api-docs",
+            "/case/api-docs",
+            "/hearing/api-docs",
+            "/workflow/api-docs",
+            "/appeal/api-docs",
+            "/compliance/api-docs",
+            "/notification/api-docs",
+            "/reporting/api-docs"
     );
 
     /**

@@ -11,21 +11,21 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 @OpenAPIDefinition(
-    info = @Info(
-        title = "CaseFlow IAM Service API",
-        version = "1.0.0",
-        description = "Identity & Access Management — Register, Login, User Management, Password Reset",
-        contact = @Contact(name = "CaseFlow Team")
-    ),
-    servers = @Server(url = "/", description = "Default Server")
+        info = @Info(
+                title = "CaseFlow IAM Service API",
+                version = "1.0.0",
+                description = "Identity & Access Management — Register, Login, User Management, Password Reset",
+                contact = @Contact(name = "CaseFlow Team")
+        ),
+        servers = @Server(url = "/", description = "Default Server")
 )
 @SecurityScheme(
-    name = "bearerAuth",
-    description = "JWT Bearer Token — Login via /api/auth/login and paste the token here",
-    scheme = "bearer",
-    type = SecuritySchemeType.HTTP,
-    bearerFormat = "JWT",
-    in = SecuritySchemeIn.HEADER
+        name = "bearerAuth",
+        description = "JWT Bearer Token — Login via /api/auth/login and paste the token here",
+        scheme = "bearer",
+        type = SecuritySchemeType.HTTP,
+        bearerFormat = "JWT",
+        in = SecuritySchemeIn.HEADER
 )
 public class OpenApiConfig {
 }
