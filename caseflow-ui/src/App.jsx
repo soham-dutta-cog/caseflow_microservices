@@ -91,7 +91,7 @@ function App() {
             <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
 
             <Route path="/appeals" element={<AppealList />} />
-            <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER']}><FileAppeal /></ProtectedRoute>} />
+            <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT']}><FileAppeal /></ProtectedRoute>} />
             <Route path="/appeals/:appealId" element={<AppealDetail />} />
 
             <Route path="/compliance" element={<ProtectedRoute roles={['ADMIN','CLERK']}><ComplianceList /></ProtectedRoute>} />

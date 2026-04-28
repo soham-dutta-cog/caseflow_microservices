@@ -15,7 +15,7 @@ const NAV_GROUPS = [
     label: 'Case Management',
     items: [
       { to: '/cases', label: 'Cases', icon: 'bi-folder2-open', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
-      { to: '/cases/file', label: 'File Case', icon: 'bi-plus-circle', roles: ['LITIGANT', 'LAWYER', 'CLERK', 'ADMIN'] },
+      { to: '/cases/file', label: 'File Case', icon: 'bi-plus-circle', roles: ['LITIGANT'] },
       { to: '/cases/documents/pending', label: 'Pending Docs', icon: 'bi-file-earmark-check', roles: ['CLERK', 'ADMIN'] },
     ],
   },
@@ -31,7 +31,7 @@ const NAV_GROUPS = [
     label: 'Legal Process',
     items: [
       { to: '/appeals', label: 'Appeals', icon: 'bi-arrow-repeat', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
-      { to: '/appeals/file', label: 'File Appeal', icon: 'bi-pencil-square', roles: ['LITIGANT', 'LAWYER'] },
+      { to: '/appeals/file', label: 'File Appeal', icon: 'bi-pencil-square', roles: ['LITIGANT'] },
       { to: '/workflow', label: 'Workflow / SLA', icon: 'bi-diagram-3', roles: ['ADMIN', 'CLERK', 'JUDGE'] },
     ],
   },

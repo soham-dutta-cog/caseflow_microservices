@@ -15,8 +15,17 @@ export default function CaseList() {
     setLoading(true); setErr('')
     try {
       let data
-      if (filter) data = await cases.byStatus(filter)
-      else data = await cases.list()
+      if (user?.role === 'LITIGANT') {
+        const id = user?.userId || user?.email
+        data = await cases.byLitigant(id)
+      } else if (user?.role === 'LAWYER') {
+        const id = user?.userId || user?.email
+        data = await cases.byLawyer(id)
+      } else if (filter) {
+        data = await cases.byStatus(filter)
+      } else {
+        data = await cases.list()
+      }
       setList(data || [])
     } catch (e) { setErr(e.message) } finally { setLoading(false) }
   }
@@ -27,7 +36,7 @@ export default function CaseList() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="page-title h3 mb-0">Cases</h1>
-        {(user?.role === 'LITIGANT' || user?.role === 'LAWYER' || user?.role === 'CLERK' || user?.role === 'ADMIN') && (
+        {user?.role === 'LITIGANT' && (
           <Link to="/cases/file" className="btn btn-dark">+ File New Case</Link>
         )}
       </div>

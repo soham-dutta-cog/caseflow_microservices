@@ -3,6 +3,7 @@ import { api } from './client'
 export const auth = {
   register: (data) => api.post('/api/auth/register', data),
   login: (data, rememberMe = false) => api.post(`/api/auth/login?rememberMe=${rememberMe}`, data),
+  me: () => api.get('/api/auth/me'),
   changePassword: (data) => api.put('/api/auth/change-password', data),
   forgotPassword: (data) => api.post('/api/auth/forgot-password', data),
   resetPassword: (data) => api.post('/api/auth/reset-password', data),
@@ -13,6 +14,7 @@ export const users = {
   create: (data) => api.post('/api/users/create', data),
   list: () => api.get('/api/users'),
   get: (id) => api.get(`/api/users/${id}`),
+  byRole: (role) => api.get(`/api/users/role/${role}`),
   setStatus: (id, status) => api.patch(`/api/users/${id}/status?status=${status}`),
   resetPassword: (id, newPassword) => api.put(`/api/users/${id}/reset-password?newPassword=${encodeURIComponent(newPassword)}`),
   auditLogs: () => api.get('/api/users/audit-logs'),
