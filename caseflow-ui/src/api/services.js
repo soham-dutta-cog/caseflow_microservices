@@ -121,8 +121,10 @@ export const notifications = {
 }
 
 export const reports = {
+  // requestedBy is read from the JWT/X-Auth-User-Id header on the backend — do NOT send it
   generate: (data) => api.post('/api/reports', data),
   get: (id) => api.get(`/api/reports/${id}`),
+  mine: () => api.get('/api/reports/me'),
   byAdmin: (adminId) => api.get(`/api/reports/admin/${adminId}`),
   byScope: (scope) => api.get(`/api/reports/scope/${scope}`),
   byClerk: (clerkId) => api.get(`/api/reports/clerk/${clerkId}`),
