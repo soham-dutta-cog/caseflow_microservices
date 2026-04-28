@@ -67,13 +67,15 @@ public class AuthenticationFilter extends AbstractGatewayFilterFactory<Authentic
                 Claims claims = jwtUtil.extractAllClaims(token);
                 String email = claims.getSubject();
                 String role = (String) claims.get("role");
+                String userId = (String) claims.get("userId");
 
                 ServerHttpRequest modifiedRequest = request.mutate()
                         .header("X-Auth-User-Email", email)
                         .header("X-Auth-User-Role", role)
+                        .header("X-Auth-User-Id", userId != null ? userId : "")
                         .build();
 
-                log.debug("JWT validated for user: {}, role: {}, path: {}", email, role, path);
+                log.debug("JWT validated for user: {}, role: {}, userId: {}, path: {}", email, role, userId, path);
                 return chain.filter(exchange.mutate().request(modifiedRequest).build());
 
             } catch (Exception e) {

@@ -8,12 +8,12 @@ spring:
     config:
       server:
         git:
-          uri: https://github.com/varun-2s/caseflow_config_server.git
-          default-label: main
+          uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
+          default-label: kalai-config
           clone-on-start: true
           skip-ssl-validation: true
-          username: varun-2s
-          password: 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
+          username: kalaikumarp-png
+          password: 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
 
 eureka:
   client:
