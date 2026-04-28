@@ -25,7 +25,8 @@ public class WorkflowService {
     // ===================== LIFECYCLE INIT =====================
 
     @Transactional
-    public void initLifecycle(Long caseId, String mode, String caseType, List<ManualStageRequest> manualStages) {
+    public void initLifecycle(Long caseId, String mode, String caseType,
+                              List<ManualStageRequest> manualStages, String requestedBy) {
         try { caseClient.setCaseType(caseId, caseType); } catch (Exception e) {
             log.warn("Failed to set case type via case-service: {}", e.getMessage());
         }
@@ -41,7 +42,7 @@ public class WorkflowService {
             initFromTemplate(caseId, stages);
         }
 
-        sendNotification(1L, caseId, "Workflow lifecycle initialized for Case #" + caseId
+        sendNotification(requestedBy, caseId, "Workflow lifecycle initialized for Case #" + caseId
                 + " (Type: " + caseType + ", Mode: " + mode + ")", "CASE");
 
         log.info("Lifecycle initialized for Case: {} Mode: {} Type: {}", caseId, mode, caseType);
@@ -102,10 +103,10 @@ public class WorkflowService {
         Optional<WorkflowStage> next = workflowStageRepository.findByCaseIdAndSequenceNumber(caseId, nextSeq);
         if (next.isPresent()) {
             activateStage(next.get());
-            sendNotification(1L, caseId, "Case #" + caseId + " advanced to Stage "
+            sendNotification("SYSTEM", caseId, "Case #" + caseId + " advanced to Stage "
                     + nextSeq + ": " + next.get().getStageName(), "CASE");
         } else {
-            sendNotification(1L, caseId, "Workflow completed for Case #" + caseId
+            sendNotification("SYSTEM", caseId, "Workflow completed for Case #" + caseId
                     + ". All stages finished.", "CASE");
             log.info("Workflow completed for Case: {}", caseId);
         }
@@ -132,11 +133,11 @@ public class WorkflowService {
                 sla.setWarningNotified(true);
                 slaRecordRepository.save(sla);
 
-                sendNotification(1L, sla.getCaseId(),
+                sendNotification("SYSTEM", sla.getCaseId(),
                         "SLA WARNING: Case #" + sla.getCaseId() + " Stage #" + sla.getStageId()
                         + " has consumed " + Math.round(usagePercent) + "% of SLA ("
                         + elapsed + "/" + sla.getSlaDays() + " days). Action needed soon!",
-                        "CASE");
+                        "COMPLIANCE");
 
                 log.warn("SLA WARNING — Case: {} Stage: {} Usage: {}%",
                         sla.getCaseId(), sla.getStageId(), Math.round(usagePercent));
@@ -149,10 +150,10 @@ public class WorkflowService {
                 sla.setBreachNotified(true);
                 slaRecordRepository.save(sla);
 
-                sendNotification(1L, sla.getCaseId(),
+                sendNotification("SYSTEM", sla.getCaseId(),
                         "SLA BREACHED: Case #" + sla.getCaseId() + " Stage #" + sla.getStageId()
                         + " exceeded SLA by " + (elapsed - sla.getSlaDays()) + " day(s).",
-                        "CASE");
+                        "COMPLIANCE");
 
                 breachCount++;
             }
@@ -164,7 +165,7 @@ public class WorkflowService {
     // ===================== FEATURE 2: ROLLBACK WORKFLOW =====================
 
     @Transactional
-    public WorkflowStageResponse rollbackWorkflow(Long caseId) {
+    public WorkflowStageResponse rollbackWorkflow(Long caseId, String requestedBy) {
         WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
                 .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId));
 
@@ -208,7 +209,7 @@ public class WorkflowService {
                 .startDate(LocalDate.now()).status(SLARecord.SLAStatus.ON_TIME)
                 .slaDays(previous.getSlaDays()).breachNotified(false).warningNotified(false).build());
 
-        sendNotification(1L, caseId, "Workflow for Case #" + caseId
+        sendNotification(requestedBy, caseId, "Workflow for Case #" + caseId
                 + " rolled back from Stage " + current.getSequenceNumber()
                 + " (" + current.getStageName() + ") to Stage " + previous.getSequenceNumber()
                 + " (" + previous.getStageName() + ")", "CASE");
@@ -222,7 +223,7 @@ public class WorkflowService {
     // ===================== FEATURE 3: SKIP STAGE =====================
 
     @Transactional
-    public WorkflowStageResponse skipCurrentStage(Long caseId, String reason) {
+    public WorkflowStageResponse skipCurrentStage(Long caseId, String reason, String requestedBy) {
         WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
                 .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId));
 
@@ -243,7 +244,7 @@ public class WorkflowService {
         if (next.isPresent()) {
             activateStage(next.get());
 
-            sendNotification(1L, caseId, "Stage " + current.getSequenceNumber()
+            sendNotification(requestedBy, caseId, "Stage " + current.getSequenceNumber()
                     + " (" + current.getStageName() + ") SKIPPED for Case #" + caseId
                     + ". Reason: " + reason + ". Moved to Stage " + nextSeq
                     + " (" + next.get().getStageName() + ")", "CASE");
@@ -251,7 +252,7 @@ public class WorkflowService {
             log.info("Stage {} skipped for Case: {}, reason: {}", current.getSequenceNumber(), caseId, reason);
             return mapToStageResponse(next.get());
         } else {
-            sendNotification(1L, caseId, "Last stage skipped for Case #" + caseId
+            sendNotification(requestedBy, caseId, "Last stage skipped for Case #" + caseId
                     + ". Workflow completed. Skip reason: " + reason, "CASE");
             log.info("Last stage skipped, workflow completed for Case: {}", caseId);
             return mapToStageResponse(current);
@@ -261,7 +262,7 @@ public class WorkflowService {
     // ===================== FEATURE 4: SLA EXTENSION / DEADLINE OVERRIDE =====================
 
     @Transactional
-    public SLARecordResponse extendSLA(Long caseId, SLAExtensionRequest request) {
+    public SLARecordResponse extendSLA(Long caseId, SLAExtensionRequest request, String requestedBy) {
         WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
                 .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId));
 
@@ -299,10 +300,10 @@ public class WorkflowService {
 
         slaRecordRepository.save(sla);
 
-        sendNotification(1L, caseId, "SLA Extended for Case #" + caseId + " Stage "
+        sendNotification(requestedBy, caseId, "SLA Extended for Case #" + caseId + " Stage "
                 + current.getSequenceNumber() + " (" + current.getStageName() + "): "
                 + oldDays + " → " + sla.getSlaDays() + " days. Reason: " + request.getReason(),
-                "CASE");
+                "COMPLIANCE");
 
         log.info("SLA extended for Case: {} Stage: {} from {} to {} days. Reason: {}",
                 caseId, current.getStageId(), oldDays, sla.getSlaDays(), request.getReason());
@@ -313,7 +314,7 @@ public class WorkflowService {
     // ===================== FEATURE 5: REASSIGN ROLE =====================
 
     @Transactional
-    public WorkflowStageResponse reassignRole(Long caseId, ReassignRoleRequest request) {
+    public WorkflowStageResponse reassignRole(Long caseId, ReassignRoleRequest request, String requestedBy) {
         WorkflowStage stage = workflowStageRepository.findById(request.getStageId())
                 .orElseThrow(() -> new ResourceNotFoundException("Stage not found: " + request.getStageId()));
 
@@ -338,7 +339,7 @@ public class WorkflowService {
         stage.setRoleResponsible(newRole);
         workflowStageRepository.save(stage);
 
-        sendNotification(1L, caseId, "Role reassigned for Case #" + caseId + " Stage "
+        sendNotification(requestedBy, caseId, "Role reassigned for Case #" + caseId + " Stage "
                 + stage.getSequenceNumber() + " (" + stage.getStageName() + "): "
                 + oldRole + " → " + newRole, "CASE");
 
@@ -415,12 +416,12 @@ public class WorkflowService {
                 .warningNotified(false).build());
     }
 
-    private void sendNotification(Long userId, Long caseId, String message, String category) {
+    private void sendNotification(String userId, Long caseId, String message, String category) {
         try {
             Map<String, Object> req = new HashMap<>();
-            req.put("userId", userId);
-            req.put("caseId", caseId);
-            req.put("message", message);
+            req.put("userId",   userId);
+            req.put("caseId",   caseId);
+            req.put("message",  message);
             req.put("category", category);
             notificationClient.sendNotification(req);
         } catch (Exception e) {
