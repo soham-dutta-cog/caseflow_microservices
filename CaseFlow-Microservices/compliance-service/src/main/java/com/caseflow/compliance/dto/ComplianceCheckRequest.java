@@ -1,6 +1,12 @@
 package com.caseflow.compliance.dto;
-import jakarta.validation.constraints.NotNull;
+
 import lombok.Data;
+
 import java.util.List;
+
 @Data
-public class ComplianceCheckRequest { @NotNull private Long adminId; private List<Long> caseIds; }
+public class ComplianceCheckRequest {
+    private List<Long> caseIds;
+    private String dateFrom;
+    private String dateTo;
+}
