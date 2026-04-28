@@ -42,6 +42,12 @@ public class HearingService {
         Hearing saved = hearingRepository.save(hearing);
         slot.setAvailable(false); slot.setHearingId(saved.getHearingId());
         scheduleRepository.save(slot);
+
+        // Notify the judge assigned to the hearing
+        sendNotification(String.valueOf(saved.getJudgeId()), saved.getCaseId(),
+            "Hearing #" + saved.getHearingId() + " scheduled for case #" + saved.getCaseId()
+            + " on " + saved.getHearingDate() + " at " + saved.getHearingTime() + ".", "HEARING");
+
         return mapToHearingResponse(saved);
     }
 
@@ -65,6 +71,13 @@ public class HearingService {
         newSlot.setAvailable(false); newSlot.setHearingId(hearingId);
         scheduleRepository.save(newSlot);
         try { caseClient.updateCaseStatusInternal(hearing.getCaseId(), "ADJOURNED"); } catch (Exception e) { log.warn("Failed to update case status: {}", e.getMessage()); }
+
+        // Notify the judge of the rescheduled hearing
+        sendNotification(String.valueOf(saved.getJudgeId()), saved.getCaseId(),
+            "Hearing #" + hearingId + " for case #" + saved.getCaseId()
+            + " has been rescheduled to " + saved.getHearingDate() + " at " + saved.getHearingTime()
+            + ". Reason: " + saved.getRescheduleReason(), "HEARING");
+
         return mapToHearingResponse(saved);
     }
 
@@ -82,6 +95,12 @@ public class HearingService {
             s.setAvailable(true); s.setHearingId(null); scheduleRepository.save(s);
         });
         try { workflowClient.advanceWorkflow(hearing.getCaseId()); } catch (Exception e) { log.warn("Failed to advance workflow: {}", e.getMessage()); }
+
+        // Notify the judge that the hearing has been completed and their slot is now free
+        sendNotification(String.valueOf(saved.getJudgeId()), saved.getCaseId(),
+            "Hearing #" + hearingId + " for case #" + saved.getCaseId()
+            + " has been marked COMPLETED. Workflow advanced.", "HEARING");
+
         return mapToHearingResponse(saved);
     }
 
@@ -96,6 +115,19 @@ public class HearingService {
     public List<ScheduleResponse> getAvailableSlotsByJudge(Long id) { return scheduleRepository.findByJudgeIdAndAvailable(id, true).stream().map(this::mapToScheduleResponse).toList(); }
     public List<ScheduleResponse> getSlotsByJudgeAndDate(Long id, java.time.LocalDate d) { return scheduleRepository.findByJudgeIdAndScheduleDate(id, d).stream().map(this::mapToScheduleResponse).toList(); }
     public List<ScheduleResponse> getAllSlotsByJudge(Long id) { return scheduleRepository.findByJudgeId(id).stream().map(this::mapToScheduleResponse).toList(); }
+
+    private void sendNotification(String userId, Long caseId, String message, String category) {
+        try {
+            Map<String, Object> req = new HashMap<>();
+            req.put("userId",   userId);
+            req.put("caseId",   caseId);
+            req.put("message",  message);
+            req.put("category", category);
+            notificationClient.sendNotification(req);
+        } catch (Exception e) {
+            log.warn("Notification failed for case #{}: {}", caseId, e.getMessage());
+        }
+    }
 
     private HearingResponse mapToHearingResponse(Hearing h) {
         HearingResponse r = new HearingResponse();

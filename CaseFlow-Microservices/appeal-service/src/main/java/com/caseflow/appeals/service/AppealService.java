@@ -107,11 +107,11 @@ public class AppealService {
 
         try {
             notificationClient.sendNotification(Map.of(
-                "type",    "APPEAL_FILED",
-                "caseId",  request.getCaseId(),
-                "userId",  currentUserId,
-                "message", "Your appeal for case #" + request.getCaseId()
-                           + " has been submitted successfully."
+                "userId",   currentUserId,
+                "caseId",   request.getCaseId(),
+                "category", "APPEAL",
+                "message",  "Your appeal for case #" + request.getCaseId()
+                            + " has been submitted successfully."
             ));
         } catch (Exception e) {
             log.warn("Failed to send APPEAL_FILED notification for appeal #{}: {}",
@@ -160,11 +160,11 @@ public class AppealService {
 
         try {
             notificationClient.sendNotification(Map.of(
-                "type",    "APPEAL_CANCELLED",
-                "caseId",  appeal.getCaseId(),
-                "userId",  appeal.getFiledByUserId(),
-                "message", "Appeal #" + appealId + " for case #" + appeal.getCaseId()
-                           + " has been cancelled."
+                "userId",   appeal.getFiledByUserId(),
+                "caseId",   appeal.getCaseId(),
+                "category", "APPEAL",
+                "message",  "Appeal #" + appealId + " for case #" + appeal.getCaseId()
+                            + " has been cancelled."
             ));
         } catch (Exception e) {
             log.warn("Failed to send APPEAL_CANCELLED notification for appeal #{}: {}",

@@ -3,6 +3,7 @@ package com.caseflow.workflow.controller;
 import com.caseflow.workflow.dto.*;
 import com.caseflow.workflow.service.WorkflowService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,9 +26,12 @@ public class WorkflowController {
         description = "Modes: 'auto' (uses template based on caseType) or 'manual' (provide custom stages). "
             + "Case types for auto: civil, criminal, corporate")
     public ResponseEntity<Map<String, Object>> initLifecycle(@PathVariable Long caseId,
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id", required = false) String userId,
             @Valid @RequestBody(required = false) LifecycleInitRequest request) {
         if (request == null) request = new LifecycleInitRequest();
-        workflowService.initLifecycle(caseId, request.getMode(), request.getCaseType(), request.getStages());
+        String requestedBy = (userId != null && !userId.isBlank()) ? userId : "SYSTEM";
+        workflowService.initLifecycle(caseId, request.getMode(), request.getCaseType(), request.getStages(), requestedBy);
         return ResponseEntity.ok(Map.of("message", "Lifecycle initialized for Case " + caseId,
             "mode", request.getMode(), "caseType", request.getCaseType()));
     }
@@ -92,8 +96,11 @@ public class WorkflowController {
         description = "Deactivates current stage and re-activates the previous non-skipped stage. "
             + "A fresh SLA timer is created for the rolled-back stage. "
             + "Cannot rollback if already at Stage 1.")
-    public ResponseEntity<WorkflowStageResponse> rollbackWorkflow(@PathVariable Long caseId) {
-        return ResponseEntity.ok(workflowService.rollbackWorkflow(caseId));
+    public ResponseEntity<WorkflowStageResponse> rollbackWorkflow(@PathVariable Long caseId,
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id", required = false) String userId) {
+        String requestedBy = (userId != null && !userId.isBlank()) ? userId : "SYSTEM";
+        return ResponseEntity.ok(workflowService.rollbackWorkflow(caseId, requestedBy));
     }
 
     // ===================== NEW: SKIP STAGE =====================
@@ -103,8 +110,11 @@ public class WorkflowController {
         description = "Marks current stage as SKIPPED (not completed), stores the skip reason, "
             + "and advances to the next stage. The reason is preserved for audit/display purposes.")
     public ResponseEntity<WorkflowStageResponse> skipCurrentStage(@PathVariable Long caseId,
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id", required = false) String userId,
             @Valid @RequestBody SkipStageRequest request) {
-        return ResponseEntity.ok(workflowService.skipCurrentStage(caseId, request.getReason()));
+        String requestedBy = (userId != null && !userId.isBlank()) ? userId : "SYSTEM";
+        return ResponseEntity.ok(workflowService.skipCurrentStage(caseId, request.getReason(), requestedBy));
     }
 
     // ===================== NEW: SLA EXTENSION =====================
@@ -115,8 +125,11 @@ public class WorkflowController {
             + "and extension reason. If the stage was BREACHED or WARNING, "
             + "status is re-evaluated with the new deadline.")
     public ResponseEntity<SLARecordResponse> extendSLA(@PathVariable Long caseId,
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id", required = false) String userId,
             @Valid @RequestBody SLAExtensionRequest request) {
-        return ResponseEntity.ok(workflowService.extendSLA(caseId, request));
+        String requestedBy = (userId != null && !userId.isBlank()) ? userId : "SYSTEM";
+        return ResponseEntity.ok(workflowService.extendSLA(caseId, request, requestedBy));
     }
 
     // ===================== NEW: REASSIGN ROLE =====================
@@ -128,7 +141,10 @@ public class WorkflowController {
             + "Cannot reassign completed or skipped stages. "
             + "Stores the previous role for audit trail.")
     public ResponseEntity<WorkflowStageResponse> reassignRole(@PathVariable Long caseId,
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id", required = false) String userId,
             @Valid @RequestBody ReassignRoleRequest request) {
-        return ResponseEntity.ok(workflowService.reassignRole(caseId, request));
+        String requestedBy = (userId != null && !userId.isBlank()) ? userId : "SYSTEM";
+        return ResponseEntity.ok(workflowService.reassignRole(caseId, request, requestedBy));
     }
 }

@@ -88,7 +88,6 @@ management:
 
 
   tracing:
-    enabled: true
     sampling:
       probability: 1.0
   zipkin:
