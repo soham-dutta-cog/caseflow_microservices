@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom'
 import { compliance } from '../../api/services'
 import { statusBadgeClass, formatDate } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
+import { useLanguage } from '../../context/LanguageContext'
 
 export default function ComplianceList() {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const isAdminOrClerk = user?.role === 'ADMIN' || user?.role === 'CLERK'
 
   const [records, setRecords]       = useState([])
@@ -37,10 +39,10 @@ export default function ComplianceList() {
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h1 className="page-title h3 mb-0">Compliance Records</h1>
+        <h1 className="page-title h3 mb-0">{t('Compliance Records')}</h1>
         {isAdminOrClerk && (
           <Link to="/compliance/check" className="btn btn-primary d-flex align-items-center gap-2">
-            <i className="bi bi-play-circle-fill" /> Run Compliance Check
+            <i className="bi bi-play-circle-fill" /> {t('Run Compliance Check')}
           </Link>
         )}
       </div>
@@ -107,7 +109,7 @@ export default function ComplianceList() {
         <div className="card-body p-0">
           {err && <div className="alert alert-danger m-3 py-2">{err}</div>}
           {loading ? (
-            <div className="text-center text-muted py-5">Loading…</div>
+            <div className="text-center text-muted py-5">{t('Loading...')}</div>
           ) : records.length === 0 ? (
             <div className="text-center text-muted py-5">
               <i className="bi bi-shield display-4 d-block mb-3 opacity-25" />

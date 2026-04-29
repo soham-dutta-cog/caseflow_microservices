@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom'
 import { notifications as notifApi } from '../../api/services'
 import { statusBadgeClass, formatDateTime, NOTIF_CATEGORY } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
+import { useLanguage } from '../../context/LanguageContext'
 
 export default function NotificationList() {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const isPrivileged = user?.role === 'ADMIN' || user?.role === 'CLERK'
 
   // Admin/clerk can look up another user's notifications by entering their ID
@@ -80,7 +82,7 @@ export default function NotificationList() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
-          <h1 className="page-title h3 mb-0">Notifications</h1>
+          <h1 className="page-title h3 mb-0">{t('Notifications')}</h1>
           {unreadCount > 0 && (
             <span className="badge text-bg-danger rounded-pill ms-2">{unreadCount} unread</span>
           )}
@@ -125,7 +127,7 @@ export default function NotificationList() {
               <label htmlFor="unreadOnly" className="form-check-label small">Unread only</label>
             </div>
             <button className="btn btn-outline-secondary btn-sm" onClick={load}>
-              <i className="bi bi-arrow-clockwise me-1" />Refresh
+              <i className="bi bi-arrow-clockwise me-1" />{t('Refresh')}
             </button>
           </div>
         </div>
@@ -135,7 +137,7 @@ export default function NotificationList() {
       <div className="card shadow-sm border-0 mb-4">
         <div className="card-body p-0">
           {loading ? (
-            <div className="text-center text-muted py-5">Loading…</div>
+            <div className="text-center text-muted py-5">{t('Loading...')}</div>
           ) : list.length === 0 ? (
             <div className="text-center text-muted py-5">
               <i className="bi bi-bell-slash display-4 d-block mb-3 opacity-25" />
