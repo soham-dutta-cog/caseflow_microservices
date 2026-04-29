@@ -8,8 +8,8 @@ spring:
     config:
       server:
         git:
-          uri: https://github.com/varun-2s/caseflow_config_server.git
-          default-label: main
+          uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
+          default-label: varun-branch
           clone-on-start: true
           skip-ssl-validation: true
           username: varun-2s

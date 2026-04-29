@@ -87,17 +87,28 @@ export const appeals = {
 }
 
 export const compliance = {
+  // Run automated compliance check — caseIds optional (empty = all cases)
+  runCheck: (data) => api.post('/api/compliance/check', data),
   byCase: (caseId) => api.get(`/api/compliance/case/${caseId}`),
+  complianceRecordsPaginated: (page = 0, size = 10) => api.get('/api/compliance/paginated', { page, size }),
+  // Audits
   createAudit: (data) => api.post('/api/audits', data),
   getAudit: (id) => api.get(`/api/audits/${id}`),
   updateFindings: (id, findings) => api.patch(`/api/audits/${id}/findings`, findings),
-  closeAudit: (id, adminId) => api.patch(`/api/audits/${id}/close?adminId=${adminId}`),
+  closeAudit: (id) => api.patch(`/api/audits/${id}/close`),   // adminId comes from JWT header
   auditsByAdmin: (adminId) => api.get(`/api/audits/admin/${adminId}`),
-  complianceRecordsPaginated: (page = 0, size = 10) => api.get('/api/compliance/paginated', { page, size }),
   auditsPaginated: (page = 0, size = 10) => api.get('/api/audits/paginated', { page, size }),
 }
 
 export const notifications = {
+  // ── Own notifications (works for ALL roles) ───────────────────────────────
+  my: () => api.get('/api/notifications/my'),
+  myUnread: () => api.get('/api/notifications/my/unread'),
+  myCount: () => api.get('/api/notifications/my/count'),
+  myMarkAllRead: () => api.patch('/api/notifications/my/read-all'),
+  myByCategory: (category) => api.get(`/api/notifications/my/category/${category}`),
+
+  // ── Admin / CLERK lookups (ADMIN + CLERK only) ────────────────────────────
   create: (data) => api.post('/api/notifications', data),
   get: (id) => api.get(`/api/notifications/${id}`),
   byUser: (userId) => api.get(`/api/notifications/user/${userId}`),
@@ -110,8 +121,10 @@ export const notifications = {
 }
 
 export const reports = {
+  // requestedBy is read from the JWT/X-Auth-User-Id header on the backend — do NOT send it
   generate: (data) => api.post('/api/reports', data),
   get: (id) => api.get(`/api/reports/${id}`),
+  mine: () => api.get('/api/reports/me'),
   byAdmin: (adminId) => api.get(`/api/reports/admin/${adminId}`),
   byScope: (scope) => api.get(`/api/reports/scope/${scope}`),
   byClerk: (clerkId) => api.get(`/api/reports/clerk/${clerkId}`),

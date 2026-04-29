@@ -151,28 +151,46 @@ export default function Home() {
           <div className="hero__orb hero__orb--2" />
           <div className="hero__orb hero__orb--3" />
         </div>
-        <div className="container hero__content text-center">
-          <h1 className="hero__title animate-in animate-in-delay-1">
-            The future of legal<br />case management is&nbsp;
-            <span className="text-gradient">here.</span>
-          </h1>
-          <p className="hero__subtitle animate-in animate-in-delay-2 mx-auto">
-            CaseFlow replaces fragmented paper-based legal systems with a single, intelligent platform
-            that automates case filing, hearing scheduling, deadline tracking, compliance checks, and reporting —
-            so legal teams can focus on justice, not paperwork.
-          </p>
-          <div className="animate-in animate-in-delay-3 d-flex flex-column flex-sm-row gap-3 justify-content-center mb-5">
-            <Link to="/login" className="btn btn-gold btn-lg">Get Started Free</Link>
-            <a href="#modules" className="btn btn-outline-light rounded-pill">Explore Modules</a>
-          </div>
-
-          <div className="hero__metrics animate-in animate-in-delay-4">
-            {metrics.map((m, i) => (
-              <div key={i} className="hero__metric">
-                <span className="hero__metric-number"><Counter end={m.number} suffix={m.suffix} /></span>
-                <span className="hero__metric-label">{m.label}</span>
+        <div className="container hero__content">
+          <div className="row align-items-center">
+            <div className="col-lg-7 text-center text-lg-start">
+              <h1 className="hero__title animate-in animate-in-delay-1">
+                The future of legal<br />case management is&nbsp;
+                <span className="text-gradient">here.</span>
+              </h1>
+              <p className="hero__subtitle animate-in animate-in-delay-2">
+                CaseFlow replaces fragmented paper-based legal systems with a single, intelligent platform
+                that automates case filing, hearing scheduling, deadline tracking, compliance checks, and reporting —
+                so legal teams can focus on justice, not paperwork.
+              </p>
+              <div className="animate-in animate-in-delay-3 d-flex flex-column flex-sm-row gap-3 justify-content-center justify-content-lg-start mb-5">
+                <Link to="/login" className="btn btn-gold btn-lg">Get Started</Link>
+                <a href="#modules" className="btn btn-outline-light rounded-pill">Explore Modules</a>
               </div>
-            ))}
+            </div>
+            <div className="col-lg-5 d-none d-lg-block">
+              <div className="animate-in animate-in-delay-4">
+                <div className="hero__metrics hero__metrics--vertical">
+                  {metrics.map((m, i) => (
+                    <div key={i} className="hero__metric hero__metric--row">
+                      <span className="hero__metric-number"><Counter end={m.number} suffix={m.suffix} /></span>
+                      <span className="hero__metric-label">{m.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Mobile metrics */}
+          <div className="d-lg-none animate-in animate-in-delay-4">
+            <div className="hero__metrics">
+              {metrics.map((m, i) => (
+                <div key={i} className="hero__metric">
+                  <span className="hero__metric-number"><Counter end={m.number} suffix={m.suffix} /></span>
+                  <span className="hero__metric-label">{m.label}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
         <div className="hero__scroll-indicator">
@@ -331,12 +349,12 @@ export default function Home() {
                   <div className="arch__node arch__node--gateway">API Gateway<span>:8085</span></div>
                   <div className="arch__connector" />
                   <div className="arch__services">
-                    {['IAM', 'Cases', 'Workflow', 'Hearing'].map((s, i) => (
+                    {['IAM', 'Cases', 'Hearing', 'Workflow'].map((s, i) => (
                       <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 1}</span></div>
                     ))}
                   </div>
                   <div className="arch__services">
-                    {['Appeals', 'Compliance', 'Notifications', 'Reports'].map((s, i) => (
+                    {['Appeals', 'Compliance', 'Notifications', 'Reporting'].map((s, i) => (
                       <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 6}</span></div>
                     ))}
                   </div>

@@ -1,11 +1,18 @@
 export default function Contact() {
   return (
     <main>
-      <section className="text-center text-white" style={{ background: 'var(--cf-navy-950)', padding: '160px 0 80px' }}>
+      <section className="text-white" style={{ background: 'var(--cf-navy-950)', padding: '160px 0 80px' }}>
         <div className="container">
-          <span className="section-label">Contact</span>
-          <h1 className="mb-2" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 5vw, 50px)', fontWeight: 600, color: '#fff' }}>Get in touch.</h1>
-          <p className="fs-5 mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>Questions about CaseFlow? Reach out to the team.</p>
+          <div className="row align-items-end">
+            <div className="col-lg-8">
+              <span className="section-label">Contact</span>
+              <h1 className="mb-2" style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 5vw, 50px)', fontWeight: 600, color: '#fff' }}>Get in touch.</h1>
+              <p className="fs-5 mb-0" style={{ color: 'rgba(255,255,255,0.5)' }}>Questions about CaseFlow? We'd love to hear from you.</p>
+            </div>
+            <div className="col-lg-4 d-none d-lg-block text-end">
+              <span style={{ fontSize: 64, filter: 'grayscale(1) brightness(1.5)', opacity: 0.3 }}>⚖</span>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { LanguageProvider } from './context/LanguageContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -36,6 +37,7 @@ import FileAppeal from './pages/appeals/FileAppeal'
 import AppealDetail from './pages/appeals/AppealDetail'
 
 import ComplianceList from './pages/compliance/ComplianceList'
+import RunComplianceCheck from './pages/compliance/RunComplianceCheck'
 import AuditList from './pages/compliance/AuditList'
 
 import NotificationList from './pages/notifications/NotificationList'
@@ -57,6 +59,7 @@ function PublicLayout({ children }) {
 
 function App() {
   return (
+    <LanguageProvider>
     <AuthProvider>
       <Router>
         <Routes>
@@ -78,24 +81,25 @@ function App() {
             <Route path="/change-password" element={<ChangePassword />} />
 
             <Route path="/cases" element={<CaseList />} />
-            <Route path="/cases/file" element={<FileCase />} />
+            <Route path="/cases/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER','CLERK']}><FileCase /></ProtectedRoute>} />
             <Route path="/cases/documents/pending" element={<ProtectedRoute roles={['CLERK','ADMIN']}><PendingDocuments /></ProtectedRoute>} />
             <Route path="/cases/:caseId" element={<CaseDetail />} />
 
             <Route path="/hearings" element={<HearingList />} />
-            <Route path="/hearings/schedule" element={<ProtectedRoute roles={['CLERK','JUDGE','ADMIN']}><ScheduleHearing /></ProtectedRoute>} />
-            <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK','ADMIN']}><JudgeSlots /></ProtectedRoute>} />
+            <Route path="/hearings/schedule" element={<ProtectedRoute roles={['CLERK','JUDGE']}><ScheduleHearing /></ProtectedRoute>} />
+            <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK']}><JudgeSlots /></ProtectedRoute>} />
             <Route path="/hearings/:hearingId" element={<HearingDetail />} />
 
-            <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK','JUDGE']}><WorkflowDashboard /></ProtectedRoute>} />
-            <Route path="/workflow/:caseId" element={<CaseWorkflow />} />
+            <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
+            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
 
             <Route path="/appeals" element={<AppealList />} />
             <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER']}><FileAppeal /></ProtectedRoute>} />
             <Route path="/appeals/:appealId" element={<AppealDetail />} />
 
+            <Route path="/compliance/check" element={<ProtectedRoute roles={['ADMIN','CLERK']}><RunComplianceCheck /></ProtectedRoute>} />
             <Route path="/compliance" element={<ProtectedRoute roles={['ADMIN','CLERK']}><ComplianceList /></ProtectedRoute>} />
-            <Route path="/audits" element={<ProtectedRoute roles={['ADMIN']}><AuditList /></ProtectedRoute>} />
+            <Route path="/audits" element={<ProtectedRoute roles={['ADMIN','CLERK']}><AuditList /></ProtectedRoute>} />
 
             <Route path="/notifications" element={<NotificationList />} />
 
@@ -108,6 +112,7 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
+    </LanguageProvider>
   )
 }
 
