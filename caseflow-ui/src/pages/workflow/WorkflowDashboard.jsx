@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { workflow } from '../../api/services'
 import { statusBadgeClass, formatDate } from '../../utils/constants'
+import { useLanguage } from '../../context/LanguageContext'
 
 export default function WorkflowDashboard() {
+  const { t } = useLanguage()
   const [breached, setBreached] = useState([])
   const [active, setActive] = useState([])
   const [warnings, setWarnings] = useState([])
@@ -49,7 +51,7 @@ export default function WorkflowDashboard() {
     <div>
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="page-title h3 mb-0">Workflow / SLA Dashboard</h1>
+        <h1 className="page-title h3 mb-0">{t('Workflow / SLA')}</h1>
         <button className="btn btn-primary shadow-sm" onClick={triggerCheck}>
           <i className="bi bi-arrow-repeat me-2"></i>Trigger SLA Check
         </button>

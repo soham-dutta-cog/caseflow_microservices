@@ -21,7 +21,11 @@ export default function CaseList() {
       let data
       if (isLitigant) {
         // LITIGANT sees only their own cases
-        data = await cases.byLitigant(encodeURIComponent(user.email))
+        data = await cases.byLitigant(encodeURIComponent(user.userId))
+        if (filter) data = (data || []).filter(c => c.status === filter)
+      } else if (user?.role === 'LAWYER') {
+        // LAWYER sees only their assigned cases
+        data = await cases.byLawyer(user.userId || user.email)
         if (filter) data = (data || []).filter(c => c.status === filter)
       } else if (filter) {
         data = await cases.byStatus(filter)
@@ -38,7 +42,7 @@ export default function CaseList() {
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="page-title h3 mb-0">{t('Cases')}</h1>
-        {(user?.role === 'LITIGANT' || user?.role === 'LAWYER' || user?.role === 'CLERK') && (
+        {(user?.role === 'LITIGANT' || user?.role === 'CLERK') && (
           <Link to="/cases/file" className="btn btn-dark">+ {t('File Case')}</Link>
         )}
       </div>

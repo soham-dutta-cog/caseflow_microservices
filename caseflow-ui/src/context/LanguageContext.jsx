@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+﻿import { createContext, useContext, useState, useEffect } from 'react'
 
 const translations = {
   english: {
@@ -23,18 +23,18 @@ const translations = {
     'No cases available yet.': 'No cases available yet.',
     'ID': 'ID', 'TITLE': 'TITLE', 'STATUS': 'STATUS', 'FILED': 'FILED', 'View': 'View',
     // Cases
-    'Cases': 'Cases', '+ File New Case': '+ File New Case', 'Filter by status:': 'Filter by status:',
+    '+ File New Case': '+ File New Case', 'Filter by status:': 'Filter by status:',
     'All': 'All', 'Refresh': 'Refresh', 'No cases found': 'No cases found', 'Loading...': 'Loading...',
     'Title': 'Title', 'Litigant': 'Litigant', 'Lawyer': 'Lawyer', 'Filed': 'Filed', 'Open': 'Open',
     // File Case
-    'File New Case': 'File New Case', 'Case Title': 'Case Title',
+    'Case Title': 'Case Title',
     'Litigant ID (user email or id)': 'Litigant ID (user email or id)',
     'Lawyer ID (optional)': 'Lawyer ID (optional)', 'Filing...': 'Filing...', 'File Case': 'File Case',
     // Hearings
-    '+ Schedule Hearing': '+ Schedule Hearing', 'Filter:': 'Filter:',
+    'Filter:': 'Filter:',
     'No hearings': 'No hearings', 'Case': 'Case', 'Judge': 'Judge', 'Date': 'Date', 'Time': 'Time',
     // Schedule Hearing
-    'Schedule Hearing': 'Schedule Hearing', 'Add a slot for the judge first, then use its ID here.': 'Add a slot for the judge first, then use its ID here.',
+    'Add a slot for the judge first, then use its ID here.': 'Add a slot for the judge first, then use its ID here.',
     'Case ID': 'Case ID', 'Judge ID': 'Judge ID', 'Hearing Date': 'Hearing Date',
     'Hearing Time': 'Hearing Time', 'Schedule Slot ID': 'Schedule Slot ID',
     'Scheduled By (user id)': 'Scheduled By (user id)', 'Scheduling...': 'Scheduling...', 'Schedule': 'Schedule',
@@ -81,12 +81,11 @@ const translations = {
     '+ File New Case': '+ नया केस दर्ज करें', 'Filter by status:': 'स्थिति से फ़िल्टर करें:',
     'All': 'सभी', 'Refresh': 'रिफ्रेश', 'No cases found': 'कोई केस नहीं मिला', 'Loading...': 'लोड हो रहा है...',
     'Title': 'शीर्षक', 'Litigant': 'वादी', 'Lawyer': 'वकील', 'Filed': 'दर्ज', 'Open': 'खोलें',
-    'File New Case': 'नया केस दर्ज करें', 'Case Title': 'केस शीर्षक',
+    'Case Title': 'केस शीर्षक',
     'Litigant ID (user email or id)': 'वादी ID (ईमेल या ID)', 'Lawyer ID (optional)': 'वकील ID (वैकल्पिक)',
     'Filing...': 'दर्ज हो रहा है...', 'File Case': 'केस दर्ज करें',
     '+ Schedule Hearing': '+ सुनवाई शेड्यूल करें', 'Filter:': 'फ़िल्टर:',
     'No hearings': 'कोई सुनवाई नहीं', 'Case': 'केस', 'Judge': 'न्यायाधीश', 'Date': 'तारीख', 'Time': 'समय',
-    'Schedule Hearing': 'सुनवाई शेड्यूल करें',
     'Add a slot for the judge first, then use its ID here.': 'पहले जज के लिए स्लॉट जोड़ें, फिर उसकी ID यहाँ डालें।',
     'Case ID': 'केस ID', 'Judge ID': 'जज ID', 'Hearing Date': 'सुनवाई तिथि',
     'Hearing Time': 'सुनवाई समय', 'Schedule Slot ID': 'स्लॉट ID',
@@ -103,7 +102,6 @@ const translations = {
     'Full Name': 'पूरा नाम', 'Phone (10 digits)': 'फ़ोन (10 अंक)',
     'Password (min 6 characters)': 'पासवर्ड (कम से कम 6 अक्षर)',
     'Create a secure password': 'एक सुरक्षित पासवर्ड बनाएं', 'Creating...': 'बन रहा है...',
-    'Create Account': 'खाता बनाएं', 'No appeals found': 'कोई अपील नहीं मिली',
   },
 
   bengali: {
@@ -147,7 +145,6 @@ const translations = {
     'Full Name': 'পুরো নাম', 'Phone (10 digits)': 'ফোন (10 সংখ্যা)',
     'Password (min 6 characters)': 'পাসওয়ার্ড (ন্যূনতম ৬ অক্ষর)',
     'Create a secure password': 'একটি নিরাপদ পাসওয়ার্ড তৈরি করুন', 'Creating...': 'তৈরি হচ্ছে...',
-    'Create Account': 'অ্যাকাউন্ট তৈরি', 'No appeals found': 'কোনো আপিল পাওয়া যায়নি',
   },
 
   tamil: {
@@ -191,7 +188,6 @@ const translations = {
     'Full Name': 'முழு பெயர்', 'Phone (10 digits)': 'தொலைபேசி (10 இலக்கம்)',
     'Password (min 6 characters)': 'கடவுச்சொல் (குறைந்தது 6 எழுத்துக்கள்)',
     'Create a secure password': 'பாதுகாப்பான கடவுச்சொல் உருவாக்கு', 'Creating...': 'உருவாக்குகிறது...',
-    'Create Account': 'கணக்கு உருவாக்கு', 'No appeals found': 'மேல்முறையீடுகள் இல்லை',
   },
 
   telugu: {
@@ -279,7 +275,7 @@ const translations = {
     'Full Name': 'पूर्ण नाव', 'Phone (10 digits)': 'फोन (10 अंक)',
     'Password (min 6 characters)': 'पासवर्ड (किमान 6 अक्षरे)',
     'Create a secure password': 'सुरक्षित पासवर्ड तयार करा', 'Creating...': 'तयार होत आहे...',
-    'Create Account': 'खाते तयार करा', 'No appeals found': 'कोणतेही अपील सापडले नाही',
+    'Create Account': 'अॅकाउंट तयार करा', 'No appeals found': 'कोणतेही अपील सापडले नाही',
   },
 
   kannada: {
@@ -350,4 +346,3 @@ export function useLanguage() {
   if (!ctx) throw new Error('useLanguage must be used within LanguageProvider')
   return ctx
 }
-

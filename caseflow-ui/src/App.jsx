@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { LanguageProvider } from './context/LanguageContext'
+import { ThemeProvider } from './context/ThemeContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -59,6 +60,7 @@ function PublicLayout({ children }) {
 
 function App() {
   return (
+    <ThemeProvider>
     <LanguageProvider>
     <AuthProvider>
       <Router>
@@ -113,6 +115,7 @@ function App() {
       </Router>
     </AuthProvider>
     </LanguageProvider>
+    </ThemeProvider>
   )
 }
 

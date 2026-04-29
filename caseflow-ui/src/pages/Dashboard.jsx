@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { cases, hearings, appeals, workflow, notifications } from '../api/services'
 import { statusBadgeClass, formatDate } from '../utils/constants'
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const [stats, setStats] = useState({ cases: 0, hearings: 0, appeals: 0, breached: 0 })
   const [recentCases, setRecentCases] = useState([])
   const [err, setErr] = useState('')
@@ -16,9 +18,9 @@ export default function Dashboard() {
       try {
         const id = user?.userId || user?.email
         const casesFetch = user?.role === 'LITIGANT'
-          ? cases.byLitigant(id)
+          ? cases.byLitigant(user.userId)
           : user?.role === 'LAWYER'
-            ? cases.byLawyer(id)
+            ? cases.byLawyer(user.userId || user.email)
             : cases.list()
         const [c, h, a, sla] = await Promise.allSettled([
           casesFetch,
@@ -41,17 +43,17 @@ export default function Dashboard() {
   }, [user])
 
   const statCards = [
-    { to: '/cases', label: 'Total Cases', value: stats.cases, icon: 'bi-folder2-open', gradient: 'linear-gradient(135deg, #4a90d9, #6baaf0)' },
-    { to: '/hearings', label: 'Hearings', value: stats.hearings, icon: 'bi-calendar-event', gradient: 'linear-gradient(135deg, #c9a84c, #d4b865)' },
-    { to: '/appeals', label: 'Appeals', value: stats.appeals, icon: 'bi-arrow-repeat', gradient: 'linear-gradient(135deg, #8b6cc1, #a88ad4)' },
-    { to: '/workflow', label: 'SLA Breached', value: stats.breached, icon: 'bi-exclamation-triangle', gradient: 'linear-gradient(135deg, #f07068, #f4918b)', danger: stats.breached > 0 },
+    { to: '/cases', label: t('Total Cases'), value: stats.cases, icon: 'bi-folder2-open', gradient: 'linear-gradient(135deg, #4a90d9, #6baaf0)' },
+    { to: '/hearings', label: t('Hearings'), value: stats.hearings, icon: 'bi-calendar-event', gradient: 'linear-gradient(135deg, #c9a84c, #d4b865)' },
+    { to: '/appeals', label: t('Appeals'), value: stats.appeals, icon: 'bi-arrow-repeat', gradient: 'linear-gradient(135deg, #8b6cc1, #a88ad4)' },
+    { to: '/workflow', label: t('SLA Breached'), value: stats.breached, icon: 'bi-exclamation-triangle', gradient: 'linear-gradient(135deg, #f07068, #f4918b)', danger: stats.breached > 0 },
   ]
 
   const greeting = () => {
     const h = new Date().getHours()
-    if (h < 12) return 'Good morning'
-    if (h < 17) return 'Good afternoon'
-    return 'Good evening'
+    if (h < 12) return t('Good morning')
+    if (h < 17) return t('Good afternoon')
+    return t('Good evening')
   }
 
   return (
@@ -59,7 +61,7 @@ export default function Dashboard() {
       {/* Header with greeting */}
       <div className="mb-4">
         <h1 className="page-title h3 mb-1">{greeting()}, {user?.name}</h1>
-        <p className="text-muted mb-0" style={{ fontSize: 14 }}>Here's what's happening with your cases today.</p>
+        <p className="text-muted mb-0" style={{ fontSize: 14 }}>{t("Here's what's happening with your cases today.")}</p>
       </div>
 
       {err && <div className="alert alert-danger py-2">{err}</div>}
@@ -96,11 +98,11 @@ export default function Dashboard() {
             
             {['CLERK', 'JUDGE', 'ADMIN'].includes(user?.role) && (
               <Link to="/hearings/schedule" className="btn btn-sm btn-outline-dark fw-medium" style={{ borderRadius: 8, padding: '8px 16px', fontSize: 13 }}>
-                <i className="bi bi-calendar-plus me-1" /> Schedule Hearing
+                <i className="bi bi-calendar-plus me-1" /> {t('Schedule Hearing')}
               </Link>
             )}
             <Link to="/notifications" className="btn btn-sm btn-outline-dark fw-medium" style={{ borderRadius: 8, padding: '8px 16px', fontSize: 13 }}>
-              <i className="bi bi-bell me-1" /> Notifications
+              <i className="bi bi-bell me-1" /> {t('Notifications')}
             </Link>
           </div>
         </div>
@@ -110,16 +112,16 @@ export default function Dashboard() {
       <div className="card border-0" style={{ borderRadius: 14, boxShadow: '0 2px 12px rgba(10,14,26,0.06)' }}>
         <div className="card-body p-4">
           <div className="d-flex justify-content-between align-items-center mb-3">
-            <h3 className="h6 fw-bold mb-0" style={{ color: '#0f1629' }}>Recent Cases</h3>
-            <Link to="/cases" className="small fw-medium" style={{ color: '#c9a84c', textDecoration: 'none' }}>View all →</Link>
+            <h3 className="h6 fw-bold mb-0" style={{ color: '#0f1629' }}>{t('Recent Cases')}</h3>
+            <Link to="/cases" className="small fw-medium" style={{ color: '#c9a84c', textDecoration: 'none' }}>{t('View all →')}</Link>
           </div>
           {recentCases.length === 0 ? (
             <div className="text-center text-muted py-4">
               <i className="bi bi-folder2-open d-block mb-2" style={{ fontSize: 32, opacity: 0.3 }} />
               {user?.role === 'LITIGANT' ? (
-                <><span>No cases yet. </span><Link to="/cases/file" style={{ color: '#c9a84c' }}>File your first case</Link></>
+                <><span>{t('No cases yet.')} </span><Link to="/cases/file" style={{ color: '#c9a84c' }}>{t('File your first case')}</Link></>
               ) : (
-                <span>No cases found.</span>
+                <span>{t('No cases available yet.')}</span>
               )}
             </div>
           ) : (
@@ -127,10 +129,10 @@ export default function Dashboard() {
               <table className="table table-hover align-middle mb-0" style={{ fontSize: 14 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #f0f2f7' }}>
-                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>ID</th>
-                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>TITLE</th>
-                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>STATUS</th>
-                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>FILED</th>
+                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>{t('ID')}</th>
+                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>{t('TITLE')}</th>
+                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>{t('STATUS')}</th>
+                    <th className="text-muted fw-semibold" style={{ fontSize: 12, letterSpacing: '0.04em' }}>{t('FILED')}</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -141,7 +143,7 @@ export default function Dashboard() {
                       <td>{c.title}</td>
                       <td><span className={`badge rounded-pill ${statusBadgeClass(c.status)}`}>{c.status}</span></td>
                       <td className="text-muted">{formatDate(c.filedDate)}</td>
-                      <td><Link to={`/cases/${c.caseId}`} className="btn btn-sm" style={{ background: '#f4f6fa', borderRadius: 8, fontSize: 12 }}>View</Link></td>
+                      <td><Link to={`/cases/${c.caseId}`} className="btn btn-sm" style={{ background: '#f4f6fa', borderRadius: 8, fontSize: 12 }}>{t('View')}</Link></td>
                     </tr>
                   ))}
                 </tbody>
