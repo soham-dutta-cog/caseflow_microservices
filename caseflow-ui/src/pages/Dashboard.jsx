@@ -14,8 +14,14 @@ export default function Dashboard() {
     let active = true
     async function load() {
       try {
+        const id = user?.userId || user?.email
+        const casesFetch = user?.role === 'LITIGANT'
+          ? cases.byLitigant(id)
+          : user?.role === 'LAWYER'
+            ? cases.byLawyer(id)
+            : cases.list()
         const [c, h, a, sla] = await Promise.allSettled([
-          cases.list(),
+          casesFetch,
           hearings.list(),
           appeals.paginated(0, 5),
           workflow.breached(),
@@ -87,11 +93,7 @@ export default function Dashboard() {
       <div className="row g-3 mb-4">
         <div className="col-12">
           <div className="d-flex flex-wrap gap-2">
-            {user?.role && ['LITIGANT', 'LAWYER', 'CLERK', 'ADMIN'].includes(user.role) && (
-              <Link to="/cases/file" className="btn btn-sm fw-medium" style={{ background: '#0f1629', color: '#fff', borderRadius: 8, padding: '8px 16px', fontSize: 13 }}>
-                <i className="bi bi-plus-circle me-1" /> File New Case
-              </Link>
-            )}
+            
             {['CLERK', 'JUDGE', 'ADMIN'].includes(user?.role) && (
               <Link to="/hearings/schedule" className="btn btn-sm btn-outline-dark fw-medium" style={{ borderRadius: 8, padding: '8px 16px', fontSize: 13 }}>
                 <i className="bi bi-calendar-plus me-1" /> Schedule Hearing
@@ -114,7 +116,11 @@ export default function Dashboard() {
           {recentCases.length === 0 ? (
             <div className="text-center text-muted py-4">
               <i className="bi bi-folder2-open d-block mb-2" style={{ fontSize: 32, opacity: 0.3 }} />
-              <span>No cases yet. </span><Link to="/cases/file" style={{ color: '#c9a84c' }}>File your first case</Link>
+              {user?.role === 'LITIGANT' ? (
+                <><span>No cases yet. </span><Link to="/cases/file" style={{ color: '#c9a84c' }}>File your first case</Link></>
+              ) : (
+                <span>No cases found.</span>
+              )}
             </div>
           ) : (
             <div className="table-responsive">

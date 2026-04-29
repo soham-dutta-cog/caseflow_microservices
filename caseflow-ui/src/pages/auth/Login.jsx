@@ -57,17 +57,42 @@ export default function Login() {
             Manage cases, track deadlines, schedule hearings, and ensure compliance — all from one intelligent platform built for legal teams.
           </p>
 
-          <div className="d-flex gap-4 mt-5">
-            {[
-              { num: '8', label: 'Microservices' },
-              { num: '50+', label: 'API Endpoints' },
-              { num: '100%', label: 'Secured' },
-            ].map((s, i) => (
-              <div key={i}>
-                <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 24, fontWeight: 700, color: '#c9a84c' }}>{s.num}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.label}</div>
-              </div>
-            ))}
+          <div
+            className="mt-5"
+            style={{
+              borderLeft: '3px solid #c9a84c',
+              paddingLeft: 18,
+              maxWidth: 420,
+              background: 'rgba(255,255,255,0.03)',
+              borderRadius: 8,
+              paddingTop: 14,
+              paddingBottom: 14,
+              paddingRight: 14,
+            }}
+          >
+            <p
+              style={{
+                fontSize: 16,
+                lineHeight: 1.7,
+                color: 'rgba(255,255,255,0.85)',
+                fontStyle: 'italic',
+                margin: 0,
+              }}
+            >
+              "Manage cases smarter,not harder-built for modern legal teams"
+            </p>
+            <p
+              style={{
+                margin: '10px 0 0',
+                textAlign: 'right',
+                fontSize: 12,
+                color: 'rgba(201,168,76,0.9)',
+                letterSpacing: '0.04em',
+                fontWeight: 600,
+              }}
+            >
+              - CaseFlow Team
+            </p>
           </div>
         </div>
 
@@ -77,8 +102,8 @@ export default function Login() {
       </div>
 
       {/* Right form panel */}
-      <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4" style={{ background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 400 }}>
+      <div className="auth-form-panel flex-grow-1 d-flex align-items-center justify-content-center p-4">
+        <div className="auth-form-shell" style={{ width: '100%', maxWidth: 400 }}>
           {/* Mobile-only logo */}
           <div className="d-lg-none text-center mb-4">
             <Link to="/" className="d-inline-flex align-items-center gap-2 text-decoration-none">
@@ -118,12 +143,12 @@ export default function Login() {
             <div className="d-flex justify-content-between align-items-center mb-4">
               <div className="form-check">
                 <input id="rm" className="form-check-input" type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
-                <label htmlFor="rm" className="form-check-label small">Remember for 7 days</label>
+                <label htmlFor="rm" className="form-check-label small">Remember me</label>
               </div>
               <Link to="/forgot-password" className="small fw-medium" style={{ color: '#c9a84c', textDecoration: 'none' }}>Forgot password?</Link>
             </div>
 
-            <button type="submit" className="btn w-100 fw-semibold" disabled={loading}
+            <button type="submit" className="auth-submit-btn btn w-100 fw-semibold" disabled={loading}
               style={{ background: '#0f1629', color: '#fff', padding: '11px', borderRadius: 10, transition: 'all 0.2s' }}>
               {loading ? <><span className="spinner-border spinner-border-sm me-2" />Signing in...</> : 'Sign In'}
             </button>

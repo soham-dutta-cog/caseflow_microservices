@@ -41,6 +41,13 @@ public class UserController {
         return ResponseEntity.ok(userService.getAllUsers());
     }
 
+    @GetMapping("/role/{role}")
+    @PreAuthorize("hasAnyRole('ADMIN','CLERK','LITIGANT','LAWYER','JUDGE')")
+    @Operation(summary = "Get all active users by role (e.g. LAWYER, LITIGANT)")
+    public ResponseEntity<List<UserResponse>> getUsersByRole(@PathVariable String role) {
+        return ResponseEntity.ok(userService.getUsersByRole(role));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','CLERK')")
     @Operation(summary = "Get user details by ID")

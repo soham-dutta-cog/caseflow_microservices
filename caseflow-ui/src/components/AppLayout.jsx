@@ -15,7 +15,7 @@ const NAV_GROUPS = [
     label: 'Case Management',
     items: [
       { to: '/cases', label: 'Cases', icon: 'bi-folder2-open', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
-      { to: '/cases/file', label: 'File Case', icon: 'bi-plus-circle', roles: ['LITIGANT', 'LAWYER', 'CLERK', 'ADMIN'] },
+      { to: '/cases/file', label: 'File Case', icon: 'bi-plus-circle', roles: ['LITIGANT'] },
       { to: '/cases/documents/pending', label: 'Pending Docs', icon: 'bi-file-earmark-check', roles: ['CLERK', 'ADMIN'] },
     ],
   },
@@ -31,16 +31,15 @@ const NAV_GROUPS = [
     label: 'Legal Process',
     items: [
       { to: '/appeals', label: 'Appeals', icon: 'bi-arrow-repeat', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
-      { to: '/appeals/file', label: 'File Appeal', icon: 'bi-pencil-square', roles: ['LITIGANT', 'LAWYER'] },
+      { to: '/appeals/file', label: 'File Appeal', icon: 'bi-pencil-square', roles: ['LITIGANT'] },
       { to: '/workflow', label: 'Workflow / SLA', icon: 'bi-diagram-3', roles: ['ADMIN', 'CLERK', 'JUDGE'] },
     ],
   },
   {
     label: 'Admin & Reports',
     items: [
-      { to: '/compliance/check', label: 'Run Compliance Check', icon: 'bi-play-circle', roles: ['ADMIN', 'CLERK'] },
-      { to: '/compliance', label: 'Compliance Records', icon: 'bi-shield-check', roles: ['ADMIN', 'CLERK'] },
-      { to: '/audits', label: 'Audits', icon: 'bi-clipboard-data', roles: ['ADMIN', 'CLERK'] },
+      { to: '/compliance', label: 'Compliance', icon: 'bi-shield-check', roles: ['ADMIN', 'CLERK'] },
+      { to: '/audits', label: 'Audits', icon: 'bi-clipboard-data', roles: ['ADMIN'] },
       { to: '/reports', label: 'Reports', icon: 'bi-bar-chart-line', roles: ['ADMIN', 'CLERK', 'LAWYER'] },
       { to: '/users', label: 'Users', icon: 'bi-people', roles: ['ADMIN'] },
       { to: '/users/audit-logs', label: 'Audit Logs', icon: 'bi-journal-text', roles: ['ADMIN'] },
@@ -68,7 +67,7 @@ export default function AppLayout() {
     async function fetchUnread() {
       if (!user) return
       try {
-        const res = await notifApi.myCount()
+        const res = await notifApi.count(user.email)
         if (active) setUnread(res?.unreadCount || 0)
       } catch { /* ignore */ }
     }

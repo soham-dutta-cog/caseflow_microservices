@@ -11,10 +11,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.List;
@@ -28,7 +30,15 @@ public class CaseController {
     private final CaseService caseService;
 
     @PostMapping("/file") @Operation(summary = "File a new case")
-    public ResponseEntity<CaseResponse> fileCase(@Valid @RequestBody CaseRequest request) {
+    public ResponseEntity<CaseResponse> fileCase(
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @Valid @RequestBody CaseRequest request) {
+        if (userRole == null || userRole.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing authentication context.");
+        }
+        if ("ADMIN".equalsIgnoreCase(userRole) || "ROLE_ADMIN".equalsIgnoreCase(userRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ADMIN cannot file cases.");
+        }
         return ResponseEntity.ok(caseService.fileCase(request));
     }
 
@@ -110,17 +120,58 @@ public class CaseController {
         return ResponseEntity.ok(caseService.updateCaseStatus(caseId, newStatus, updatedBy));
     }
 
-    @GetMapping("/{caseId}") public ResponseEntity<CaseResponse> getCaseById(@PathVariable Long caseId) {
-        return ResponseEntity.ok(caseService.getCaseById(caseId));
+    @GetMapping("/{caseId}") public ResponseEntity<CaseResponse> getCaseById(
+            @PathVariable Long caseId,
+            @RequestHeader(value = "X-Auth-User-Role",  required = false) String userRole,
+            @RequestHeader(value = "X-Auth-User-Id",    required = false) String userId,
+            @RequestHeader(value = "X-Auth-User-Email", required = false) String userEmail) {
+        CaseResponse c = caseService.getCaseById(caseId);
+        // LITIGANT may only open their own cases
+        if ("LITIGANT".equalsIgnoreCase(userRole)) {
+            boolean isOwner = (userId != null && userId.equals(c.getLitigantId()))
+                           || (userEmail != null && userEmail.equals(c.getLitigantId()));
+            if (!isOwner) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own cases.");
+            }
+        }
+        return ResponseEntity.ok(c);
     }
-    @GetMapping public ResponseEntity<List<CaseResponse>> getAllCases() { return ResponseEntity.ok(caseService.getAllCases()); }
-    @GetMapping("/litigant/{litigantId}") public ResponseEntity<List<CaseResponse>> getCasesByLitigant(@PathVariable String litigantId) {
+
+    @GetMapping public ResponseEntity<List<CaseResponse>> getAllCases(
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole) {
+        if ("LITIGANT".equalsIgnoreCase(userRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "LITIGANTs cannot list all cases. Use /api/cases/litigant/{id} instead.");
+        }
+        return ResponseEntity.ok(caseService.getAllCases());
+    }
+
+    @GetMapping("/litigant/{litigantId}") public ResponseEntity<List<CaseResponse>> getCasesByLitigant(
+            @PathVariable String litigantId,
+            @RequestHeader(value = "X-Auth-User-Role",  required = false) String userRole,
+            @RequestHeader(value = "X-Auth-User-Id",    required = false) String userId,
+            @RequestHeader(value = "X-Auth-User-Email", required = false) String userEmail) {
+        // LITIGANT can only fetch their own cases
+        if ("LITIGANT".equalsIgnoreCase(userRole)) {
+            boolean isOwner = litigantId.equals(userId) || litigantId.equals(userEmail);
+            if (!isOwner) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You can only view your own cases.");
+            }
+        }
         return ResponseEntity.ok(caseService.getCasesByLitigant(litigantId));
     }
+
     @GetMapping("/lawyer/{lawyerId}") public ResponseEntity<List<CaseResponse>> getCasesByLawyer(@PathVariable String lawyerId) {
         return ResponseEntity.ok(caseService.getCasesByLawyer(lawyerId));
     }
-    @GetMapping("/status/{status}") public ResponseEntity<List<CaseResponse>> getCasesByStatus(@PathVariable Case.CaseStatus status) {
+
+    @GetMapping("/status/{status}") public ResponseEntity<List<CaseResponse>> getCasesByStatus(
+            @PathVariable Case.CaseStatus status,
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole) {
+        if ("LITIGANT".equalsIgnoreCase(userRole)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "LITIGANTs cannot filter all cases by status. Use /api/cases/litigant/{id} and filter client-side.");
+        }
         return ResponseEntity.ok(caseService.getCasesByStatus(status));
     }
     @GetMapping("/{caseId}/documents") public ResponseEntity<List<DocumentResponse>> getDocumentsByCaseId(@PathVariable Long caseId) {

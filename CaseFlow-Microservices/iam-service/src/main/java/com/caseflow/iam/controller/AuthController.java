@@ -10,6 +10,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -52,6 +54,15 @@ public class AuthController {
     public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         return ResponseEntity.ok(passwordResetService.resetPassword(
                 request.getToken(), request.getNewPassword(), request.getConfirmPassword()));
+    }
+
+    @GetMapping("/me")
+    @SecurityRequirement(name = "bearerAuth")
+    @Operation(summary = "Get the currently authenticated user's profile (userId, name, role, email)")
+    public ResponseEntity<UserResponse> me() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String email = auth.getName();
+        return ResponseEntity.ok(userService.getCurrentUser(email));
     }
 
     @PostMapping("/logout")

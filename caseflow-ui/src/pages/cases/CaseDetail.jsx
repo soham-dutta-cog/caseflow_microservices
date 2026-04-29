@@ -103,7 +103,11 @@ export default function CaseDetail() {
     </div>
   )
 
-  const canUpload = ['LITIGANT', 'LAWYER', 'CLERK', 'ADMIN'].includes(user?.role)
+  const canUpload = (
+    user?.role === 'ADMIN' ||
+    (user?.role === 'LAWYER' && c.lawyerId && (c.lawyerId === user?.userId || c.lawyerId === user?.email)) ||
+    (user?.role === 'LITIGANT' && !c.lawyerId)
+  )
   const canVerify = ['CLERK', 'ADMIN'].includes(user?.role)
   const canUpdateStatus = ['CLERK', 'JUDGE', 'ADMIN'].includes(user?.role)
 
@@ -113,7 +117,7 @@ export default function CaseDetail() {
         <h1 className="page-title h3 mb-0">Case #{c.caseId}: {c.title}</h1>
         <div className="d-flex gap-2 flex-wrap">
           {['ADMIN','CLERK'].includes(user?.role) && <Link to={`/workflow/${c.caseId}`} className="btn btn-outline-secondary btn-sm">Workflow</Link>}
-          <Link to={`/appeals/file?caseId=${c.caseId}`} className="btn btn-outline-secondary btn-sm">File Appeal</Link>
+          {user?.role === 'LITIGANT' && <Link to={`/appeals/file?caseId=${c.caseId}`} className="btn btn-outline-secondary btn-sm">File Appeal</Link>}
         </div>
       </div>
       {err && <div className="alert alert-danger py-2">{err}</div>}

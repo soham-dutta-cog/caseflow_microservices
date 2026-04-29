@@ -15,6 +15,9 @@ app:
   mail:
     from-name: CaseFlow Admin
     from-address: ${spring.mail.username:}
+    brand:
+      logo-path: email-assets/logo.png
+      banner-path: email-assets/banner.png
 
 management:
   tracing:
