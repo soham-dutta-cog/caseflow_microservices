@@ -12,6 +12,12 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [showPass, setShowPass] = useState(false)
 
+  const heroStats = [
+    { value: '1000+', label: 'Cases Managed' },
+    { value: '24/7', label: 'Access' },
+    { value: '100%', label: 'Secure' },
+  ]
+
   const update = (k) => (e) => setForm({ ...form, [k]: e.target.value })
 
   const submit = async (e) => {
@@ -55,14 +61,34 @@ export default function Register() {
           <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.4)', lineHeight: 1.7, maxWidth: 340 }}>
             Create your account and start managing cases, tracking deadlines, and collaborating with your legal team instantly.
           </p>
+
+          <div className="d-flex flex-wrap gap-3 mt-4" style={{ maxWidth: 400 }}>
+            {heroStats.map((stat) => (
+              <div
+                key={stat.label}
+                style={{
+                  minWidth: 118,
+                  flex: '1 1 118px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(201,168,76,0.25)',
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  boxShadow: '0 8px 22px rgba(5, 8, 18, 0.22)',
+                }}
+              >
+                <div style={{ fontFamily: 'Playfair Display, serif', fontSize: 21, fontWeight: 700, color: '#c9a84c', lineHeight: 1.2 }}>{stat.value}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 3 }}>{stat.label}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <p style={{ position: 'relative', zIndex: 1, fontSize: 12, color: 'rgba(255,255,255,0.25)' }}>© 2026 CaseFlow — Cognizant</p>
       </div>
 
       {/* Right form */}
-      <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4" style={{ background: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
+      <div className="auth-form-panel flex-grow-1 d-flex align-items-center justify-content-center p-4">
+        <div className="auth-form-shell" style={{ width: '100%', maxWidth: 420 }}>
           <div className="d-lg-none text-center mb-4">
             <Link to="/" className="d-inline-flex align-items-center gap-2 text-decoration-none">
               <span style={{ fontSize: 22, filter: 'grayscale(1) brightness(0.5)' }}>⚖</span>
@@ -111,7 +137,7 @@ export default function Register() {
               </div>
             </div>
             <input type="hidden" value={form.role} />
-            <button type="submit" className="btn w-100 fw-semibold mt-2" disabled={loading}
+            <button type="submit" className="auth-submit-btn btn w-100 fw-semibold mt-2" disabled={loading}
               style={{ background: '#0f1629', color: '#fff', padding: '11px', borderRadius: 10 }}>
               {loading ? <><span className="spinner-border spinner-border-sm me-2" />Creating...</> : 'Create Account'}
             </button>

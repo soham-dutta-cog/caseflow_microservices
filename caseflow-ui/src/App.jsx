@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { LanguageProvider } from './context/LanguageContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -58,6 +59,7 @@ function PublicLayout({ children }) {
 
 function App() {
   return (
+    <LanguageProvider>
     <AuthProvider>
       <Router>
         <Routes>
@@ -79,13 +81,13 @@ function App() {
             <Route path="/change-password" element={<ChangePassword />} />
 
             <Route path="/cases" element={<CaseList />} />
-            <Route path="/cases/file" element={<FileCase />} />
+            <Route path="/cases/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER','CLERK']}><FileCase /></ProtectedRoute>} />
             <Route path="/cases/documents/pending" element={<ProtectedRoute roles={['CLERK','ADMIN']}><PendingDocuments /></ProtectedRoute>} />
             <Route path="/cases/:caseId" element={<CaseDetail />} />
 
             <Route path="/hearings" element={<HearingList />} />
-            <Route path="/hearings/schedule" element={<ProtectedRoute roles={['CLERK','JUDGE','ADMIN']}><ScheduleHearing /></ProtectedRoute>} />
-            <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK','ADMIN']}><JudgeSlots /></ProtectedRoute>} />
+            <Route path="/hearings/schedule" element={<ProtectedRoute roles={['CLERK','JUDGE']}><ScheduleHearing /></ProtectedRoute>} />
+            <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK']}><JudgeSlots /></ProtectedRoute>} />
             <Route path="/hearings/:hearingId" element={<HearingDetail />} />
 
             <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
@@ -110,6 +112,7 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
+    </LanguageProvider>
   )
 }
 

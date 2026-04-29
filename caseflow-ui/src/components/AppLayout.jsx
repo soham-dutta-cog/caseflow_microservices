@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 import { notifications as notifApi } from '../api/services'
 import './AppLayout.css'
 
@@ -15,7 +16,7 @@ const NAV_GROUPS = [
     label: 'Case Management',
     items: [
       { to: '/cases', label: 'Cases', icon: 'bi-folder2-open', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
-      { to: '/cases/file', label: 'File Case', icon: 'bi-plus-circle', roles: ['LITIGANT', 'LAWYER', 'CLERK', 'ADMIN'] },
+      { to: '/cases/file', label: 'File Case', icon: 'bi-plus-circle', roles: ['LITIGANT', 'LAWYER', 'CLERK'] },
       { to: '/cases/documents/pending', label: 'Pending Docs', icon: 'bi-file-earmark-check', roles: ['CLERK', 'ADMIN'] },
     ],
   },
@@ -23,8 +24,8 @@ const NAV_GROUPS = [
     label: 'Hearings',
     items: [
       { to: '/hearings', label: 'Hearings', icon: 'bi-calendar-event', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
-      { to: '/hearings/schedule', label: 'Schedule', icon: 'bi-calendar-plus', roles: ['CLERK', 'JUDGE', 'ADMIN'] },
-      { to: '/hearings/slots', label: 'Judge Slots', icon: 'bi-clock-history', roles: ['JUDGE', 'CLERK', 'ADMIN'] },
+      { to: '/hearings/schedule', label: 'Schedule', icon: 'bi-calendar-plus', roles: ['CLERK', 'JUDGE'] },
+      { to: '/hearings/slots', label: 'Judge Slots', icon: 'bi-clock-history', roles: ['JUDGE', 'CLERK'] },
     ],
   },
   {
@@ -56,12 +57,25 @@ const NAV_GROUPS = [
 
 export default function AppLayout() {
   const { user, logout } = useAuth()
+  const { language, setLanguage, t } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const [unread, setUnread] = useState(0)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [theme, setTheme] = useState(() => localStorage.getItem('caseflow-theme') || 'light')
   const profileRef = useRef(null)
+
+  const languages = [
+    { value: 'english', label: 'English' },
+    { value: 'hindi', label: 'Hindi' },
+    { value: 'bengali', label: 'Bengali' },
+    { value: 'tamil', label: 'Tamil' },
+    { value: 'telugu', label: 'Telugu' },
+    { value: 'marathi', label: 'Marathi' },
+    { value: 'kannada', label: 'Kannada' },
+  ]
 
   useEffect(() => {
     let active = true
@@ -77,15 +91,11 @@ export default function AppLayout() {
     return () => { active = false; clearInterval(t) }
   }, [user])
 
-  useEffect(() => { setDrawerOpen(false); setProfileOpen(false) }, [location])
+  useEffect(() => { setDrawerOpen(false); setProfileOpen(false); setSettingsOpen(false) }, [location])
 
   useEffect(() => {
-    const handler = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) setProfileOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+    localStorage.setItem('caseflow-theme', theme)
+  }, [theme])
 
   const handleLogout = async () => {
     await logout()
@@ -100,8 +110,19 @@ export default function AppLayout() {
   const allItems = visibleGroups.flatMap(g => g.items)
   const initials = (user?.name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setProfileOpen(false)
+        setSettingsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell app-shell--${theme}`}>
       {/* ===== TOP BAR ===== */}
       <header className="app-topbar">
         <div className="app-topbar__left">
@@ -124,7 +145,7 @@ export default function AppLayout() {
               className={({ isActive }) => `app-topbar__navlink ${isActive ? 'app-topbar__navlink--active' : ''}`}
             >
               <i className={`bi ${item.icon}`} />
-              <span>{item.label}</span>
+              <span>{t(item.label)}</span>
               {item.to === '/notifications' && unread > 0 && (
                 <span className="app-topbar__inline-badge">{unread}</span>
               )}
@@ -133,7 +154,7 @@ export default function AppLayout() {
           {allItems.length > 8 && (
             <button className="app-topbar__navlink" onClick={() => setDrawerOpen(true)} style={{ border: 'none', background: 'none' }}>
               <i className="bi bi-three-dots" />
-              <span>More</span>
+              <span>{t('More')}</span>
             </button>
           )}
         </nav>
@@ -145,7 +166,10 @@ export default function AppLayout() {
           </NavLink>
 
           <div className="app-topbar__profile" ref={profileRef}>
-            <button className="app-topbar__avatar-btn" onClick={() => setProfileOpen(!profileOpen)}>
+            <button className="app-topbar__avatar-btn" onClick={() => {
+              setProfileOpen(!profileOpen)
+              if (profileOpen) setSettingsOpen(false)
+            }}>
               <span className="app-topbar__avatar">{initials}</span>
               <span className="app-topbar__uname">{user?.name}</span>
               <i className={`bi bi-chevron-${profileOpen ? 'up' : 'down'}`} style={{ fontSize: 11 }} />
@@ -157,11 +181,45 @@ export default function AppLayout() {
                   <span className="app-topbar__role-pill">{user?.role}</span>
                 </div>
                 <hr className="my-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+                <button className="app-topbar__dd-item" onClick={() => setSettingsOpen(!settingsOpen)}>
+                  <i className="bi bi-gear me-2" /> {t('Settings')}
+                </button>
+
+                {settingsOpen && (
+                  <div className="app-topbar__settings">
+                    <div className="app-topbar__settings-row">
+                      <span className="app-topbar__settings-label">{t('Theme')}</span>
+                      <button
+                        type="button"
+                        className="app-topbar__theme-btn"
+                        onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                      >
+                        <i className={`bi ${theme === 'light' ? 'bi-moon-stars' : 'bi-brightness-high'} me-1`} />
+                        {theme === 'light' ? t('Dark') : t('Light')}
+                      </button>
+                    </div>
+                    <div className="app-topbar__settings-row">
+                      <label htmlFor="lang-select" className="app-topbar__settings-label">{t('Language')}</label>
+                      <select
+                        id="lang-select"
+                        className="app-topbar__lang-select"
+                        value={language}
+                        onChange={(e) => setLanguage(e.target.value)}
+                      >
+                        {languages.map((lang) => (
+                          <option key={lang.value} value={lang.value}>{lang.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <hr className="my-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }} />
                 <Link to="/change-password" className="app-topbar__dd-item">
-                  <i className="bi bi-key me-2" /> Change Password
+                  <i className="bi bi-key me-2" /> {t('Change Password')}
                 </Link>
                 <button onClick={handleLogout} className="app-topbar__dd-item app-topbar__dd-item--danger">
-                  <i className="bi bi-box-arrow-right me-2" /> Sign Out
+                  <i className="bi bi-box-arrow-right me-2" /> {t('Sign Out')}
                 </button>
               </div>
             )}
@@ -173,7 +231,7 @@ export default function AppLayout() {
       <div className={`app-overlay ${drawerOpen ? 'app-overlay--show' : ''}`} onClick={() => setDrawerOpen(false)} />
       <aside className={`app-drawer ${drawerOpen ? 'app-drawer--open' : ''}`}>
         <div className="app-drawer__head">
-          <span className="app-drawer__head-title">Navigation</span>
+          <span className="app-drawer__head-title">{t('Navigation')}</span>
           <button className="app-drawer__close" onClick={() => setDrawerOpen(false)}>
             <i className="bi bi-x-lg" />
           </button>
@@ -181,7 +239,7 @@ export default function AppLayout() {
         <nav className="app-drawer__nav">
           {visibleGroups.map((group, gi) => (
             <div key={gi} className="app-drawer__section">
-              {group.label && <div className="app-drawer__section-label">{group.label}</div>}
+              {group.label && <div className="app-drawer__section-label">{t(group.label)}</div>}
               {group.items.map(item => (
                 <NavLink
                   key={item.to}
@@ -190,7 +248,7 @@ export default function AppLayout() {
                   className={({ isActive }) => `app-drawer__link ${isActive ? 'app-drawer__link--active' : ''}`}
                 >
                   <i className={`bi ${item.icon}`} />
-                  <span>{item.label}</span>
+                  <span>{t(item.label)}</span>
                   {item.to === '/notifications' && unread > 0 && (
                     <span className="badge rounded-pill text-bg-danger ms-auto" style={{ fontSize: 10 }}>{unread}</span>
                   )}
@@ -208,7 +266,7 @@ export default function AppLayout() {
             </div>
           </div>
           <button onClick={handleLogout} className="btn btn-outline-light btn-sm w-100">
-            <i className="bi bi-box-arrow-right me-1" /> Sign Out
+            <i className="bi bi-box-arrow-right me-1" /> {t('Sign Out')}
           </button>
         </div>
       </aside>
