@@ -13,10 +13,20 @@ export const SLA_STATUS = ['ACTIVE', 'WARNING', 'BREACHED', 'CLOSED']
 export const COMPLIANCE_RESULT = ['PASS', 'FAIL', 'NEEDS_REVIEW']
 export const AUDIT_STATUS = ['OPEN', 'CLOSED', 'PENDING']
 
-export const NOTIF_CATEGORY = ['CASE_UPDATE', 'DEADLINE', 'HEARING', 'DECISION', 'APPEAL', 'SYSTEM', 'AUDIT', 'SLA_WARNING', 'SLA_BREACH']
+export const NOTIF_CATEGORY = ['CASE', 'HEARING', 'APPEAL', 'COMPLIANCE']
 export const NOTIF_STATUS = ['READ', 'UNREAD']
 
-export const REPORT_SCOPE = ['SYSTEM', 'ADMIN', 'CLERK', 'LAWYER', 'CASE']
+export const REPORT_SCOPE = ['COURT', 'JUDGE', 'PERIOD', 'CLERK', 'LAWYER', 'CASE', 'COMPLIANCE']
+
+export const REPORT_SCOPE_HELP = {
+  COURT:      { label: 'System-wide', placeholder: 'ALL', hint: 'Whole court / system-wide aggregate. Use "ALL" or any label.' },
+  JUDGE:      { label: 'By Judge',    placeholder: 'Judge user-id (e.g. 12)', hint: 'Numeric judge id. Filters cases & hearings to this judge.' },
+  PERIOD:     { label: 'Date range',  placeholder: 'e.g. Q1 2026',            hint: 'Pick dateFrom and dateTo below. scopeValue is just a label.' },
+  CLERK:      { label: 'By Clerk',    placeholder: 'Clerk user-id',           hint: 'System-wide metrics tagged to a clerk for tracking.' },
+  LAWYER:     { label: 'By Lawyer',   placeholder: 'Lawyer email or id',      hint: 'Filters to cases this lawyer represents.' },
+  CASE:       { label: 'Single case', placeholder: 'Case id (e.g. 42)',       hint: 'Drill-down report for one specific case.' },
+  COMPLIANCE: { label: 'Compliance',  placeholder: 'ALL',                     hint: 'Compliance-focused report (audit trail + checks).' },
+}
 
 export const CASE_TYPES = ['civil', 'criminal', 'corporate']
 export const LIFECYCLE_MODES = ['auto', 'manual']

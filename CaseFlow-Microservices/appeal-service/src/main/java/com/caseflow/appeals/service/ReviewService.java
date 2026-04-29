@@ -80,12 +80,11 @@ public class ReviewService {
         // Notify the filer their appeal is now under review
         try {
             notificationClient.sendNotification(Map.of(
-                "type",    "APPEAL_UNDER_REVIEW",
-                "caseId",  appeal.getCaseId(),
-                "userId",  appeal.getFiledByUserId(),
-                "judgeId", judgeId,
-                "message", "Appeal #" + appealId + " for case #" + appeal.getCaseId()
-                           + " is now under review by an assigned judge."
+                "userId",   appeal.getFiledByUserId(),
+                "caseId",   appeal.getCaseId(),
+                "category", "APPEAL",
+                "message",  "Appeal #" + appealId + " for case #" + appeal.getCaseId()
+                            + " is now under review by an assigned judge."
             ));
         } catch (Exception e) {
             log.warn("Failed to send APPEAL_UNDER_REVIEW notification for appeal #{}: {}", appealId, e.getMessage());
@@ -164,13 +163,11 @@ public class ReviewService {
         // Notify the appeal filer of the outcome
         try {
             notificationClient.sendNotification(Map.of(
-                "type",    "APPEAL_DECIDED",
-                "caseId",  appeal.getCaseId(),
-                "userId",  appeal.getFiledByUserId(),
-                "judgeId", judgeId,
-                "outcome", outcome.name(),
-                "message", "Appeal #" + appealId + " for case #" + appeal.getCaseId()
-                           + " has been decided. Outcome: " + outcome.name()
+                "userId",   appeal.getFiledByUserId(),
+                "caseId",   appeal.getCaseId(),
+                "category", "APPEAL",
+                "message",  "Appeal #" + appealId + " for case #" + appeal.getCaseId()
+                            + " has been decided. Outcome: " + outcome.name()
             ));
         } catch (Exception e) {
             log.warn("Failed to send APPEAL_DECIDED notification for appeal #{}: {}", appealId, e.getMessage());
