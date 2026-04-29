@@ -1,0 +1,443 @@
+import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import './Home.css'
+
+/* ===== Scroll-triggered animation hook ===== */
+function useReveal() {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisible(true) },
+      { threshold: 0.15 }
+    )
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, visible]
+}
+
+function Reveal({ children, className = '', delay = 0 }) {
+  const [ref, visible] = useReveal()
+  return (
+    <div ref={ref} className={`reveal ${visible ? 'reveal--visible' : ''} ${className}`} style={{ transitionDelay: `${delay}ms` }}>
+      {children}
+    </div>
+  )
+}
+
+/* ===== Animated counter ===== */
+function Counter({ end, duration = 2000, suffix = '' }) {
+  const [count, setCount] = useState(0)
+  const [ref, visible] = useReveal()
+  useEffect(() => {
+    if (!visible) return
+    let start = 0
+    const step = end / (duration / 16)
+    const timer = setInterval(() => {
+      start += step
+      if (start >= end) { setCount(end); clearInterval(timer) }
+      else setCount(Math.floor(start))
+    }, 16)
+    return () => clearInterval(timer)
+  }, [visible, end, duration])
+  return <span ref={ref}>{count}{suffix}</span>
+}
+
+/* ===== Data ===== */
+const modules = [
+  {
+    icon: '🔐', title: 'Identity & Access Management', color: '#8b6cc1', tag: 'Security',
+    headline: 'Enterprise-grade security that never gets in the way.',
+    desc: 'Role-based access control with JWT authentication ensures every user — from litigants to judges to administrators — sees only what they are authorized to see. Secure login, session management, and comprehensive audit logging of every action taken in the system.',
+    features: ['JWT token-based authentication', 'Role-based access control (RBAC)', 'Secure password encryption with BCrypt', 'Complete audit trail of all user actions', 'Session management & token expiry'],
+    stat: '100%', statLabel: 'API endpoints secured',
+  },
+  {
+    icon: '📁', title: 'Case Filing & Documentation', color: '#4a90d9', tag: 'Core',
+    headline: 'From paper stacks to digital filing in seconds.',
+    desc: 'Digitize the entire case filing process. Litigants and lawyers can file new cases, upload supporting documents, and track document verification status — all from a single interface. Automatic status transitions ensure cases move forward without manual intervention.',
+    features: ['Digital case filing with auto-generated IDs', 'Document upload with verification workflow', 'Auto-activation when all documents verified', 'Case status tracking (Filed → Active → Closed)', 'Search by litigant, lawyer, or status'],
+    stat: '70%', statLabel: 'Faster than paper filing',
+  },
+  {
+    icon: '⚙', title: 'Workflow & SLA Engine', color: '#2dd4a8', tag: 'Automation',
+    headline: 'Never miss a deadline. Ever.',
+    desc: 'The intelligent workflow engine automatically initializes lifecycle stages for every case, tracks SLA deadlines in real-time, and triggers breach notifications before deadlines are missed. Supports stage advancement, rollback, skip, and reassignment — giving clerks full control over case progression.',
+    features: ['Auto-initialized lifecycle stages per case type', 'Real-time SLA countdown & breach detection', 'Stage advance, rollback, skip & reassign', 'SLA extension requests with audit trail', 'Warning notifications before deadline breach'],
+    stat: '95%', statLabel: 'SLA compliance rate',
+  },
+  {
+    icon: '⚖', title: 'Hearing & Scheduling', color: '#e8a838', tag: 'Scheduling',
+    headline: 'Smart scheduling that respects everyone\'s time.',
+    desc: 'Court clerks can manage judge calendars, check availability in real-time, and schedule hearings without conflicts. Automatic notifications go out to all parties. Supports rescheduling and completion with outcome recording — the entire hearing lifecycle in one place.',
+    features: ['Judge calendar & availability management', 'Conflict-free hearing slot allocation', 'Automatic notifications to all parties', 'Reschedule with reason tracking', 'Hearing completion with outcome recording'],
+    stat: '0', statLabel: 'Scheduling conflicts',
+  },
+  {
+    icon: '📋', title: 'Appeals Management', color: '#f07068', tag: 'Legal Process',
+    headline: 'Transparent appeals. Fair outcomes.',
+    desc: 'When a decision is contested, the appeals module handles the entire process — from filing through review assignment to final decision. Each appeal is tracked with full transparency, complete with reviewer assignment, hearing linkage, and automatic status updates to the parent case.',
+    features: ['Appeal filing against case decisions', 'Automatic reviewer assignment', 'Decision tracking with outcome recording', 'Parent case status auto-update', 'Complete appeal history & timeline'],
+    stat: '100%', statLabel: 'Appeal transparency',
+  },
+  {
+    icon: '✅', title: 'Compliance & Audit', color: '#1a9e7e', tag: 'Governance',
+    headline: 'Stay compliant. Stay confident.',
+    desc: 'Automated compliance checks run at every critical stage of a case. The audit module maintains an immutable trail of every action, every change, and every decision — ensuring regulatory compliance and providing a complete forensic record when needed.',
+    features: ['Automated compliance checks at each stage', 'Immutable audit trail for all actions', 'Admin-led audit creation & closure', 'Findings documentation with timestamps', 'Compliance scoring per case'],
+    stat: '100%', statLabel: 'Audit coverage',
+  },
+  {
+    icon: '🔔', title: 'Smart Notifications', color: '#c9a84c', tag: 'Communication',
+    headline: 'The right alert, to the right person, at the right time.',
+    desc: 'Real-time notifications keep every stakeholder informed — from SLA breach warnings to hearing schedules to appeal decisions. Supports per-user notification feeds, read/unread tracking, bulk mark-as-read, and categorized alerts so important updates never get lost in the noise.',
+    features: ['Real-time event-driven notifications', 'Per-user notification feed & history', 'Read/unread tracking with bulk actions', 'Categorized alerts (SLA, Hearing, Case)', 'Cross-service event consumption'],
+    stat: '<1s', statLabel: 'Notification delivery',
+  },
+  {
+    icon: '📊', title: 'Reports & Analytics', color: '#4a5d8a', tag: 'Insights',
+    headline: 'Data-driven decisions for legal operations.',
+    desc: 'Generate comprehensive reports across every dimension — case volumes, SLA metrics, hearing statistics, compliance scores, and more. Administrators get a bird\'s-eye view of the entire system with configurable report scopes and exportable data for stakeholder presentations.',
+    features: ['Cross-service data aggregation', 'Configurable report scopes & filters', 'Case volume & status distribution', 'SLA performance metrics', 'Admin-level system-wide dashboards'],
+    stat: '8', statLabel: 'Data sources unified',
+  },
+]
+
+const metrics = [
+  { number: 8, suffix: '', label: 'Independent Microservices' },
+  { number: 11, suffix: '', label: 'Spring Cloud Services' },
+  { number: 50, suffix: '+', label: 'REST API Endpoints' },
+  { number: 8, suffix: '', label: 'Dedicated Databases' },
+]
+
+const techStack = [
+  { category: 'Backend', items: ['Spring Boot 3.2', 'Spring Cloud Gateway', 'Spring Security + JWT', 'Spring Data JPA', 'OpenFeign Clients'] },
+  { category: 'Infrastructure', items: ['Netflix Eureka Discovery', 'Spring Cloud Config Server', 'Resilience4j Circuit Breaker', 'MySQL (Database per Service)', 'Vite Dev Proxy'] },
+  { category: 'Frontend', items: ['React 18', 'React Router v6', 'Vite Build Tool', 'CSS Custom Properties', 'Responsive Design'] },
+]
+
+const team = [
+  { name: 'Varun', role: 'IAM & Security Module', avatar: '👤' },
+  { name: 'Ananya', role: 'Case Filing Module', avatar: '👤' },
+  { name: 'Sumita', role: 'Hearing & Scheduling Module', avatar: '👤' },
+  { name: 'Soham', role: 'Workflow & SLA Module', avatar: '👤' },
+  { name: 'Kalai', role: 'Appeals Module', avatar: '👤' },
+  { name: 'Rashad', role: 'Compliance & Audit Module', avatar: '👤' },
+  { name: 'Harsh', role: 'Notifications Module', avatar: '👤' },
+  { name: 'Puneeth', role: 'Reporting & Analytics Module', avatar: '👤' },
+]
+
+const whyCards = [
+  { icon: '🏛', title: 'Built for Legal', desc: 'Not a generic project management tool — every feature is purpose-built for legal case workflows, court scheduling, and compliance requirements.' },
+  { icon: '🔄', title: 'Fault Tolerant', desc: 'Circuit breakers on every inter-service call. If notifications go down, case filing keeps working. No single point of failure.' },
+  { icon: '⚡', title: 'Real-Time', desc: 'SLA breach detection, instant notifications, live status updates — everything happens in real-time, not batch-processed overnight.' },
+  { icon: '🔒', title: 'Secure by Design', desc: 'JWT authentication at the gateway level, role-based access control, encrypted passwords, and immutable audit trails on every action.' },
+  { icon: '📐', title: 'Independently Scalable', desc: 'Each microservice scales independently. Heavy reporting load? Scale just the reporting service without touching the rest.' },
+  { icon: '🧩', title: 'Modular Architecture', desc: 'Each module is owned, developed, and deployed independently by a single team member — true microservice ownership.' },
+]
+
+export default function Home() {
+  const [activeModule, setActiveModule] = useState(0)
+
+  return (
+    <main>
+      {/* ===== HERO ===== */}
+      <section className="hero">
+        <div className="hero__bg">
+          <div className="hero__gradient" />
+          <div className="hero__grid-pattern" />
+          <div className="hero__orb hero__orb--1" />
+          <div className="hero__orb hero__orb--2" />
+          <div className="hero__orb hero__orb--3" />
+        </div>
+        <div className="container hero__content">
+          <div className="row align-items-center">
+            <div className="col-lg-7 text-center text-lg-start">
+              <h1 className="hero__title animate-in animate-in-delay-1">
+                The future of legal<br />case management is&nbsp;
+                <span className="text-gradient">here.</span>
+              </h1>
+              <p className="hero__subtitle animate-in animate-in-delay-2">
+                CaseFlow replaces fragmented paper-based legal systems with a single, intelligent platform
+                that automates case filing, hearing scheduling, deadline tracking, compliance checks, and reporting —
+                so legal teams can focus on justice, not paperwork.
+              </p>
+              <div className="animate-in animate-in-delay-3 d-flex flex-column flex-sm-row gap-3 justify-content-center justify-content-lg-start mb-5">
+                <Link to="/login" className="btn btn-gold btn-lg">Get Started</Link>
+                <a href="#modules" className="btn btn-outline-light rounded-pill">Explore Modules</a>
+              </div>
+            </div>
+            <div className="col-lg-5 d-none d-lg-block">
+              <div className="animate-in animate-in-delay-4">
+                <div className="hero__metrics hero__metrics--vertical">
+                  {metrics.map((m, i) => (
+                    <div key={i} className="hero__metric hero__metric--row">
+                      <span className="hero__metric-number"><Counter end={m.number} suffix={m.suffix} /></span>
+                      <span className="hero__metric-label">{m.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Mobile metrics */}
+          <div className="d-lg-none animate-in animate-in-delay-4">
+            <div className="hero__metrics">
+              {metrics.map((m, i) => (
+                <div key={i} className="hero__metric">
+                  <span className="hero__metric-number"><Counter end={m.number} suffix={m.suffix} /></span>
+                  <span className="hero__metric-label">{m.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="hero__scroll-indicator">
+          <div className="hero__scroll-line" />
+        </div>
+      </section>
+
+      {/* ===== BRAND STORY ===== */}
+      <section className="brand section">
+        <div className="container">
+          <div className="row g-5 align-items-start">
+            <div className="col-12 col-lg-5">
+              <Reveal>
+                <div>
+                  <span className="section-label">Why CaseFlow?</span>
+                  <h2 className="section-title">Courts shouldn't run on spreadsheets and sticky notes.</h2>
+                </div>
+              </Reveal>
+            </div>
+            <div className="col-12 col-lg-7">
+              <Reveal delay={200}>
+                <div className="text-secondary" style={{ lineHeight: 1.8 }}>
+                  <p className="mb-3">Every year, thousands of legal cases are delayed, mismanaged, or lost in bureaucratic chaos — not because of bad lawyers or judges, but because of outdated systems that were never designed for the complexity of modern legal operations.</p>
+                  <p className="mb-3">CaseFlow changes that. We built a platform from the ground up, using microservices architecture and cloud-native technology, to handle every stage of a legal case — from the moment it is filed to its final resolution. Every deadline tracked. Every document verified. Every stakeholder notified. Automatically.</p>
+                  <p className="brand__highlight fs-6 mb-0">This isn't just digitization. It's a complete rethink of how legal workflows should operate in 2026.</p>
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== WHY CASEFLOW ===== */}
+      <section className="why section">
+        <div className="container">
+          <Reveal>
+            <div className="section-header">
+              <span className="section-label">What Sets Us Apart</span>
+              <h2 className="section-title">Six reasons legal teams choose CaseFlow.</h2>
+            </div>
+          </Reveal>
+          <div className="row g-3">
+            {whyCards.map((card, i) => (
+              <div key={i} className="col-12 col-md-6 col-lg-4">
+                <Reveal delay={i * 80}>
+                  <div className="why-card h-100 p-4 rounded-3">
+                    <span className="d-block mb-3" style={{ fontSize: 28 }}>{card.icon}</span>
+                    <h3 className="h6 fw-bold text-dark mb-2">{card.title}</h3>
+                    <p className="small text-secondary mb-0" style={{ lineHeight: 1.7 }}>{card.desc}</p>
+                  </div>
+                </Reveal>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== MODULES — DETAILED SHOWCASE ===== */}
+      <section className="modules section" id="modules">
+        <div className="container">
+          <Reveal>
+            <div className="section-header">
+              <span className="section-label">Platform Modules</span>
+              <h2 className="section-title">Eight modules. One seamless experience.</h2>
+              <p className="section-subtitle">Each module is an independent microservice — built, deployed, and scaled separately. Click any module to explore what it does.</p>
+            </div>
+          </Reveal>
+
+          {/* Module selector tabs */}
+          <div className="mod-tabs d-flex flex-wrap justify-content-center">
+            {modules.map((mod, i) => (
+              <button
+                key={i}
+                className={`mod-tab ${activeModule === i ? 'mod-tab--active' : ''}`}
+                onClick={() => setActiveModule(i)}
+                style={{ '--tab-color': mod.color }}
+              >
+                <span className="fs-6">{mod.icon}</span>
+                <span className="mod-tab__title">{mod.title.split(' ')[0]}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Active module detail */}
+          <div className="mod-detail" key={activeModule}>
+            <div className="text-center text-md-start">
+              <span className="mod-detail__tag" style={{ background: modules[activeModule].color }}>{modules[activeModule].tag}</span>
+              <h3 className="mod-detail__title">{modules[activeModule].title}</h3>
+              <p className="mod-detail__headline">{modules[activeModule].headline}</p>
+            </div>
+            <div className="row g-4">
+              <div className="col-12 col-lg-7">
+                <div>
+                  <p className="text-secondary mb-4" style={{ fontSize: 15, lineHeight: 1.8 }}>{modules[activeModule].desc}</p>
+                  <div className="mod-detail__stat">
+                    <span className="mod-detail__stat-number">{modules[activeModule].stat}</span>
+                    <span className="small fw-medium text-secondary">{modules[activeModule].statLabel}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="col-12 col-lg-5">
+                <div className="mod-detail__features">
+                  <h4>Key Capabilities</h4>
+                  <ul>
+                    {modules[activeModule].features.map((f, j) => (
+                      <li key={j}><span className="fw-bold" style={{ color: modules[activeModule].color, fontSize: 16 }}>✓</span> {f}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick-access cards */}
+          <div className="row g-2">
+            {modules.map((mod, i) => (
+              <div key={i} className="col-12 col-md-6 col-lg-3">
+                <Reveal delay={i * 60}>
+                  <button className="mod-mini-card w-100" onClick={() => { setActiveModule(i); document.getElementById('modules').scrollIntoView({ behavior: 'smooth' }) }} style={{ '--accent': mod.color }}>
+                    <span className="fs-5">{mod.icon}</span>
+                    <span className="mod-mini-card__title">{mod.title}</span>
+                    <span className="mod-mini-card__arrow">→</span>
+                  </button>
+                </Reveal>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+
+      {/* ===== ARCHITECTURE ===== */}
+      <section className="arch section">
+        <div className="container">
+          <div className="row g-5 align-items-center">
+            <div className="col-12 col-lg-6">
+              <Reveal>
+                <div>
+                  <span className="section-label">Architecture</span>
+                  <h2 className="section-title text-white">Built on microservices.<br />Designed for resilience.</h2>
+                  <p className="arch__desc fs-6 mb-4" style={{ lineHeight: 1.7 }}>Every request flows through the API Gateway, authenticated via JWT, routed by Eureka service discovery, and protected by Resilience4j circuit breakers. If one service goes down, the rest keep running with graceful fallbacks.</p>
+                  <div className="row g-3">
+                    <div className="col-6 arch__feature"><span className="fs-6">🛡</span> API Gateway routing</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">🔍</span> Eureka service discovery</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">⚡</span> Circuit breaker fallbacks</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">🗄</span> Database per service</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">⚙</span> Centralized config server</div>
+                    <div className="col-6 arch__feature"><span className="fs-6">🔐</span> JWT at gateway level</div>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+            <div className="col-12 col-lg-6">
+              <Reveal delay={200}>
+                <div className="arch__visual">
+                  <div className="arch__node arch__node--gateway">API Gateway<span>:8085</span></div>
+                  <div className="arch__connector" />
+                  <div className="arch__services">
+                    {['IAM', 'Cases', 'Hearing', 'Workflow'].map((s, i) => (
+                      <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 1}</span></div>
+                    ))}
+                  </div>
+                  <div className="arch__services">
+                    {['Appeals', 'Compliance', 'Notifications', 'Reporting'].map((s, i) => (
+                      <div key={i} className="arch__node arch__node--service">{s}<span>:808{i + 6}</span></div>
+                    ))}
+                  </div>
+                  <div className="arch__infra">
+                    <div className="arch__node arch__node--infra">Eureka<span>:8761</span></div>
+                    <div className="arch__node arch__node--infra">Config Server<span>:8888</span></div>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ===== TECH STACK ===== */}
+      <section className="tech section" id="tech">
+        <div className="container">
+          <Reveal>
+            <div className="section-header">
+              <span className="section-label">Tech Stack</span>
+              <h2 className="section-title">Powered by modern Java<br />and cloud-native tools.</h2>
+            </div>
+          </Reveal>
+          <div className="row g-4">
+            {techStack.map((group, i) => (
+              <div key={i} className="col-12 col-md-6 col-lg-4">
+                <Reveal delay={i * 120}>
+                  <div className="tech__card h-100 p-4 rounded-3">
+                    <h3 className="tech__card-title">{group.category}</h3>
+                    <ul className="tech__list list-unstyled mb-0">
+                      {group.items.map((item, j) => (
+                        <li key={j} className="tech__item"><span className="tech__item-dot" />{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </Reveal>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== TEAM ===== */}
+      <section className="team section" id="team">
+        <div className="container">
+          <Reveal>
+            <div className="section-header">
+              <span className="section-label">Our Team</span>
+              <h2 className="section-title">8 interns. 8 modules.<br />One integrated platform.</h2>
+              <p className="section-subtitle">Each team member owns an independent microservice end-to-end — from database design to REST API to frontend interface.</p>
+            </div>
+          </Reveal>
+          <div className="row g-3">
+            {team.map((member, i) => (
+              <div key={i} className="col-12 col-sm-6 col-lg-3">
+                <Reveal delay={i * 60}>
+                  <div className="team-card text-center p-4 rounded-3 h-100">
+                    <div className="team-card__avatar mx-auto">{member.avatar}</div>
+                    <h4 className="fw-semibold text-dark mb-1" style={{ fontSize: 15 }}>{member.name}</h4>
+                    <p className="small text-secondary mb-0">{member.role}</p>
+                  </div>
+                </Reveal>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ===== CTA ===== */}
+      <section className="cta section">
+        <div className="container">
+          <Reveal>
+            <div className="cta__inner text-center">
+              <h2 className="cta__title">Ready to see CaseFlow in action?</h2>
+              <p className="cta__desc fs-6 mx-auto">Sign in to explore the platform, manage cases, track deadlines, and experience the future of legal operations.</p>
+              <div className="cta__actions d-flex flex-column flex-sm-row gap-3 justify-content-center">
+                <Link to="/login" className="btn btn-gold btn-lg">Get Started</Link>
+                <Link to="/how-it-works" className="btn btn-dark rounded-pill">Read the Docs</Link>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+    </main>
+  )
+}

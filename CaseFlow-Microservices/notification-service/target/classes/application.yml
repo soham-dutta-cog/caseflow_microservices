@@ -1,33 +1,8 @@
-server:
-  port: 8088
-
 spring:
   application:
     name: notification-service
-  datasource:
-    url: jdbc:mysql://localhost:3306/caseflow_notification_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: admin
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
-    time-zone: Asia/Kolkata
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    prefer-ip-address: true
+  config:
+    import: optional:configserver:http://localhost:8888
 
 springdoc:
   api-docs:
@@ -35,7 +10,3 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
-
-logging:
-  level:
-    com.caseflow: DEBUG

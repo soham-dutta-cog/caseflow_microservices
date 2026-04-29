@@ -16,7 +16,9 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     public void run(String... args) {
         if (!userRepository.existsByEmail("admin@caseflow.com")) {
+            String adminId = "SUP_ADMIN_" + (userRepository.countByRole(User.Role.ADMIN) + 1);
             userRepository.save(User.builder()
+                .userId(adminId)
                 .name("Super Admin").email("admin@caseflow.com").phone("9000000001")
                 .password(passwordEncoder.encode("admin123"))
                 .role(User.Role.ADMIN).status(User.Status.ACTIVE).build());

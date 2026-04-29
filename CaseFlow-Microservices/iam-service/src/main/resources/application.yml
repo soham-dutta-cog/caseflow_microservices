@@ -1,35 +1,8 @@
-server:
-  port: 8081
-
 spring:
   application:
     name: iam-service
   config:
     import: optional:configserver:http://localhost:8888
-  datasource:
-    url: jdbc:mysql://localhost:3306/caseflow_iam_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: admin
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
-    time-zone: Asia/Kolkata
-
-eureka:
-  client:
-    service-url:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    prefer-ip-address: true
 
 springdoc:
   api-docs:
@@ -38,10 +11,18 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
-logging:
-  level:
-    com.caseflow: DEBUG
+app:
+  mail:
+    from-name: CaseFlow Admin
+    from-address: ${spring.mail.username:}
+    brand:
+      logo-path: email-assets/logo.png
+      banner-path: email-assets/banner.png
 
-jwt:
-  secret: caseflow_secret_key_must_be_32chars_min_!!!
-  expiration: 86400000
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  zipkin:
+    tracing:
+      endpoint: http://localhost:9411/api/v2/spans

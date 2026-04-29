@@ -23,7 +23,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/swagger-ui/**", "/swagger-ui.html",
                     "/api-docs/**", "/v3/api-docs/**", "/api/users/validate/**",
-                    "/api/users/exists/**", "/api/users/*/role").permitAll()
+                    "/api/users/exists/**", "/api/users/*/role", "/actuator/**").permitAll()
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

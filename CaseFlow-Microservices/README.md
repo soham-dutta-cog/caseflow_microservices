@@ -1,80 +1,35 @@
-# CaseFlow Microservices Architecture
+# CaseFlow — Caching & Pagination Patch
 
-## Services & Ports
+## What's Inside
+This zip contains ONLY new files to ADD to your existing project.
+NO existing files are modified.
 
-| Service               | Port | Database               |
-|-----------------------|------|------------------------|
-| Eureka Server         | 8761 | -                      |
-| API Gateway           | 8085 | -                      |
-| IAM Service           | 8081 | caseflow_iam_db        |
-| Case Service          | 8082 | caseflow_case_db       |
-| Hearing Service       | 8083 | caseflow_hearing_db    |
-| Workflow Service      | 8084 | caseflow_workflow_db   |
-| Appeal Service        | 8086 | caseflow_appeal_db     |
-| Compliance Service    | 8087 | caseflow_compliance_db |
-| Notification Service  | 8088 | caseflow_notification_db |
-| Reporting Service     | 8089 | caseflow_reporting_db  |
+## How to Apply
+Copy each service folder into your CaseFlow-Microservices directory.
+The folder structure mirrors your project exactly — just merge/overlay.
 
-## Startup Order
+## Per-Service New Files
 
-1. **Eureka Server** (8761) — Service registry
-2. **API Gateway** (8085) — Routes all `/api/**` to services
-3. **IAM Service** (8081) — Auth & user management (start first among business services)
-4. **All other services** — Can be started in any order
+Each of the 8 business services gets 3 new files:
+1. `config/CacheConfig.java` — enables `@EnableCaching` with `ConcurrentMapCacheManager`
+2. `config/PaginationConfig.java` — enables `@EnableSpringDataWebSupport`
+3. `service/Cached<Module>Service.java` — paginated queries + `@Cacheable` on key lookups
+4. `controller/Paginated<Module>Controller.java` — new `/paginated` endpoints
 
-## How to Run
+## No POM Changes Needed
+`spring-boot-starter-cache` is already transitively included via `spring-boot-starter-data-jpa`.
+`Page`/`Pageable` is part of `spring-data-commons` (already in your classpath via JPA starter).
+So NO pom.xml changes are required.
 
-```bash
-# From root directory
-# 1. Start Eureka
-cd eureka-server && mvn spring-boot:run
-
-# 2. Start API Gateway
-cd api-gateway && mvn spring-boot:run
-
-# 3. Start IAM Service
-cd iam-service && mvn spring-boot:run
-
-# 4. Start remaining services (any order)
-cd case-service && mvn spring-boot:run
-cd hearing-service && mvn spring-boot:run
-cd workflow-service && mvn spring-boot:run
-cd appeal-service && mvn spring-boot:run
-cd compliance-service && mvn spring-boot:run
-cd notification-service && mvn spring-boot:run
-cd reporting-service && mvn spring-boot:run
+## Paginated Endpoint Pattern
+All paginated endpoints follow this pattern:
 ```
+GET /api/<module>/paginated?page=0&size=10&sort=id,desc
+```
+Returns a Spring `Page<T>` JSON with: content, totalElements, totalPages, number, size, etc.
 
-## Inter-Service Communication
-
-Services communicate via **OpenFeign** clients through the **Eureka** service registry.
-
-- All services register with Eureka at `http://localhost:8761/eureka/`
-- The API Gateway routes requests using `lb://service-name`
-- Each service has its own MySQL database (auto-created)
-- Feign clients use logical service names (e.g., `@FeignClient(name = "iam-service")`)
-
-## Swagger UI
-
-Each service has its own Swagger UI:
-- IAM: http://localhost:8081/swagger-ui.html
-- Cases: http://localhost:8082/swagger-ui.html
-- Hearings: http://localhost:8083/swagger-ui.html
-- Workflow: http://localhost:8084/swagger-ui.html
-- Appeals: http://localhost:8086/swagger-ui.html
-- Compliance: http://localhost:8087/swagger-ui.html
-- Notifications: http://localhost:8088/swagger-ui.html
-- Reporting: http://localhost:8089/swagger-ui.html
-
-## Test Cases
-
-Each service has its own unit tests using JUnit 5 + Mockito.
-Run tests: `mvn test` from any service directory.
-
-## MySQL Configuration
-
-Default credentials in all services:
-- Username: `root`
-- Password: `11222004`
-
-Update `application.yml` in each service to change database credentials.
+## Cache Behavior
+- Uses Spring's ConcurrentMapCacheManager (in-memory, zero config)
+- Cached endpoints: getUserById, getCaseById, getReportById, getSLAByStageId
+- Cache is per-JVM (each microservice instance has its own cache)
+- Cache auto-creates on first access — no cache names need to be pre-registered

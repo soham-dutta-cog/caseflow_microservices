@@ -4,13 +4,16 @@ server:
 spring:
   application:
     name: config-server
-  profiles:
-    active: native
   cloud:
     config:
       server:
-        native:
-          search-locations: classpath:/configs
+        git:
+          uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
+          default-label: ananya-branch
+          clone-on-start: true
+          skip-ssl-validation: true
+          username: ananyan75
+          password: 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
 
 eureka:
   client:

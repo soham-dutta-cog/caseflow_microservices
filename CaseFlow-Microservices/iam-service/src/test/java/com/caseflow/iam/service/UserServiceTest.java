@@ -22,31 +22,56 @@ class UserServiceTest {
     @Mock private JwtUtil jwtUtil;
     @Mock private AuthenticationManager authenticationManager;
     @Mock private AuditLogService auditLogService;
+    @Mock private TokenBlacklistService tokenBlacklistService;
+    @Mock private EmailService emailService;
     @InjectMocks private UserService userService;
 
     @Test void getUserById_found() {
-        User user = User.builder().userId(1L).name("Test").role(User.Role.ADMIN)
+        User user = User.builder().userId("TES_ADMIN_1").name("Test").role(User.Role.ADMIN)
             .email("test@test.com").status(User.Status.ACTIVE).build();
-        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        UserResponse result = userService.getUserById(1L);
+        when(userRepository.findById("TES_ADMIN_1")).thenReturn(Optional.of(user));
+        UserResponse result = userService.getUserById("TES_ADMIN_1");
         assertEquals("Test", result.getName());
     }
 
     @Test void getUserById_notFound_throws() {
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById(99L));
+        when(userRepository.findById("INVALID_99")).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> userService.getUserById("INVALID_99"));
     }
 
     @Test void register_duplicateEmail_throws() {
-        when(userRepository.existsByEmail("dup@test.com")).thenReturn(true);
+        when(userRepository.existsByEmail("dup@gmail.com")).thenReturn(true);
         UserRequest req = new UserRequest();
-        req.setEmail("dup@test.com"); req.setName("Dup"); req.setRole(User.Role.LITIGANT);
+        req.setEmail("dup@gmail.com"); req.setName("Dup"); req.setRole(User.Role.LITIGANT);
         req.setPhone("1234567890"); req.setPassword("pass123");
         assertThrows(DuplicateResourceException.class, () -> userService.registerLitigant(req));
     }
 
     @Test void existsById_true() {
-        when(userRepository.existsById(1L)).thenReturn(true);
-        assertTrue(userService.existsById(1L));
+        when(userRepository.existsById("TES_ADMIN_1")).thenReturn(true);
+        assertTrue(userService.existsById("TES_ADMIN_1"));
+    }
+
+    @Test void registerLitigant_sendsEmailWithUserId() {
+        UserRequest req = new UserRequest();
+        req.setEmail("litigant@gmail.com");
+        req.setName("Liti");
+        req.setPhone("1234567890");
+        req.setPassword("pass123");
+
+        when(userRepository.existsByEmail("litigant@gmail.com")).thenReturn(false);
+        when(userRepository.countByRole(User.Role.LITIGANT)).thenReturn(0L);
+        when(userRepository.existsById("LIT_LITIGANT_1")).thenReturn(false);
+        when(passwordEncoder.encode("pass123")).thenReturn("encoded-pass");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.registerLitigant(req);
+
+        assertEquals("LIT_LITIGANT_1", response.getUserId());
+        verify(emailService).sendEmail(
+                eq("litigant@gmail.com"),
+                eq("Your CaseFlow Account Has Been Created"),
+                argThat(body -> body != null && body.contains("LIT_LITIGANT_1"))
+        );
     }
 }
