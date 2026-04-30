@@ -1,8 +1,10 @@
 package com.caseflow.appeals.controller;
 
 import com.caseflow.appeals.dto.request.AppealRequest;
+import com.caseflow.appeals.dto.response.AppealAuditResponse;
 import com.caseflow.appeals.dto.response.AppealResponse;
 import com.caseflow.appeals.entity.Appeal.AppealStatus;
+import com.caseflow.appeals.service.AppealAuditService;
 import com.caseflow.appeals.service.AppealService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,8 +30,9 @@ import java.util.List;
 @Tag(name = "Appeals", description = "File, query, and cancel appeals")
 public class AppealController {
 
-    private final AppealService appealService;
-    private final RoleGuard     roleGuard;
+    private final AppealService        appealService;
+    private final AppealAuditService   auditService;
+    private final RoleGuard            roleGuard;
 
     // ─── File an Appeal ───────────────────────────────────────────────────────
 
@@ -127,6 +130,40 @@ public class AppealController {
 
         roleGuard.requireAnyRole(userRole, "ADMIN", "CLERK", "JUDGE");
         return ResponseEntity.ok(appealService.getAppealsByStatus(status));
+    }
+
+    // ─── Audit Trail ─────────────────────────────────────────────────────────
+
+    @Operation(
+        summary     = "Get the full audit trail for an appeal",
+        description = "Append-only record of every state-changing action: filings, cancellations, " +
+                      "assignments, draft outcome changes, decisions, document uploads/deletions. " +
+                      "Newest first. Restricted to the filer, the assigned judge, CLERK, and ADMIN."
+    )
+    @GetMapping("/{id}/audit")
+    public ResponseEntity<List<AppealAuditResponse>> getAuditTrail(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id",   required = false) String currentUserId,
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @PathVariable Long id) {
+
+        roleGuard.requireAnyRole(userRole, "LITIGANT", "LAWYER", "JUDGE", "CLERK", "ADMIN");
+        roleGuard.requireUserId(currentUserId);
+
+        // LITIGANT/LAWYER may only view audit trails for appeals they filed.
+        boolean isPrivileged = "ADMIN".equalsIgnoreCase(userRole)
+                            || "CLERK".equalsIgnoreCase(userRole)
+                            || "JUDGE".equalsIgnoreCase(userRole);
+        if (!isPrivileged) {
+            AppealResponse appeal = appealService.getAppealById(id);
+            if (!currentUserId.equals(appeal.getFiledByUserId())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can only view the audit trail for appeals you filed.");
+            }
+        }
+        return ResponseEntity.ok(auditService.getAuditTrail(id));
     }
 
     // ─── Cancel an Appeal ─────────────────────────────────────────────────────

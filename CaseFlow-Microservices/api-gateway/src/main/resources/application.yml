@@ -52,6 +52,9 @@ spring:
             - Path=/api/appeals/**
           filters:
             - AuthenticationFilter
+            # 10 POSTs per 60s per authenticated user (X-Auth-User-Id), or per IP.
+            # Throttles abusive filing/upload bursts; non-POST traffic is unaffected.
+            - RateLimit=10,60,POST
 
         - id: compliance
           uri: lb://compliance-service
