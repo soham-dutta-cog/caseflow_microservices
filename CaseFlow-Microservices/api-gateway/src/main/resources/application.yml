@@ -52,6 +52,9 @@ spring:
             - Path=/api/appeals/**
           filters:
             - AuthenticationFilter
+            # 10 POSTs per 60s per authenticated user (X-Auth-User-Id), or per IP.
+            # Throttles abusive filing/upload bursts; non-POST traffic is unaffected.
+            - RateLimit=10,60,POST
 
         - id: compliance
           uri: lb://compliance-service
@@ -80,6 +83,63 @@ spring:
             - Path=/api/reports/**
           filters:
             - AuthenticationFilter
+
+        # ── Swagger / OpenAPI doc proxy routes (no auth required) ────────────
+        - id: iam-swagger
+          uri: lb://iam-service
+          predicates:
+            - Path=/iam/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: case-swagger
+          uri: lb://case-service
+          predicates:
+            - Path=/case/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: hearing-swagger
+          uri: lb://hearing-service
+          predicates:
+            - Path=/hearing/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: workflow-swagger
+          uri: lb://workflow-service
+          predicates:
+            - Path=/workflow/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: appeal-swagger
+          uri: lb://appeal-service
+          predicates:
+            - Path=/appeal/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: compliance-swagger
+          uri: lb://compliance-service
+          predicates:
+            - Path=/compliance/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: notification-swagger
+          uri: lb://notification-service
+          predicates:
+            - Path=/notification/api-docs
+          filters:
+            - StripPrefix=1
+
+        - id: reporting-swagger
+          uri: lb://reporting-service
+          predicates:
+            - Path=/reporting/api-docs
+          filters:
+            - StripPrefix=1
 
       default-filters:
         - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_UNIQUE

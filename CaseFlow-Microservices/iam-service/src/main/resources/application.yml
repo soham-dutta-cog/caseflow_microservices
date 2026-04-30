@@ -4,10 +4,20 @@ spring:
   config:
     import: optional:configserver:http://localhost:8888
 
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
 app:
   mail:
     from-name: CaseFlow Admin
     from-address: ${spring.mail.username:}
+    brand:
+      logo-path: email-assets/logo.png
+      banner-path: email-assets/banner.png
 
 management:
   tracing:
@@ -16,14 +26,3 @@ management:
   zipkin:
     tracing:
       endpoint: http://localhost:9411/api/v2/spans
-
-
-
-
-
-
-
-
-
-
-

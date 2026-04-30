@@ -7,6 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -41,15 +42,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorBody(400, ex.getMessage()));
     }
 
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<Map<String, Object>> handleBadReq(BadRequestException ex) {
-        return ResponseEntity.badRequest().body(errorBody(400, ex.getMessage()));
-    }
-
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return ResponseEntity.badRequest().body(errorBody(400,
             "Invalid value '" + ex.getValue() + "' for parameter '" + ex.getName() + "'"));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatus(ResponseStatusException ex) {
+        int status = ex.getStatusCode().value();
+        return ResponseEntity.status(status).body(errorBody(status, ex.getReason()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -57,16 +59,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(errorBody(400, ex.getMessage()));
     }
 
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex) {
-        log.error("Runtime error: {}", ex.getMessage());
-        return ResponseEntity.badRequest().body(errorBody(400, ex.getMessage()));
+    @ExceptionHandler(org.springframework.dao.OptimisticLockingFailureException.class)
+    public ResponseEntity<Map<String, Object>> handleOptimisticLock(
+            org.springframework.dao.OptimisticLockingFailureException ex) {
+        log.warn("Optimistic lock conflict: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorBody(409,
+            "The resource was modified concurrently. Please refresh and retry."));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneral(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
-        return ResponseEntity.status(500).body(errorBody(500, "An unexpected error occurred"));
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(errorBody(500, "An unexpected error occurred"));
     }
 
     private Map<String, Object> errorBody(int status, String message) {

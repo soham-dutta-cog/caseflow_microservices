@@ -1,11 +1,29 @@
 package com.caseflow.reporting.service;
 
+import com.caseflow.reporting.client.AppealServiceClient;
+import com.caseflow.reporting.client.CaseServiceClient;
+import com.caseflow.reporting.client.ComplianceServiceClient;
+import com.caseflow.reporting.client.HearingServiceClient;
+import com.caseflow.reporting.client.WorkflowServiceClient;
+import com.caseflow.reporting.client.dto.AppealDto;
+import com.caseflow.reporting.client.dto.CaseDto;
+import com.caseflow.reporting.client.dto.ComplianceRecordDto;
+import com.caseflow.reporting.client.dto.DocumentDto;
+import com.caseflow.reporting.client.dto.HearingDto;
+import com.caseflow.reporting.client.dto.PageResponse;
+import com.caseflow.reporting.client.dto.ReviewDto;
+import com.caseflow.reporting.client.dto.SLARecordDto;
 import com.caseflow.reporting.dto.ReportRequest;
 import com.caseflow.reporting.dto.ReportResponse;
 import com.caseflow.reporting.entity.Report;
+import com.caseflow.reporting.entity.Report.ReportScope;
 import com.caseflow.reporting.exception.BadRequestException;
 import com.caseflow.reporting.exception.ResourceNotFoundException;
 import com.caseflow.reporting.repository.ReportRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,35 +32,70 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
+/**
+ * Generates analytics reports by aggregating REAL data from other microservices.
+ *
+ * Replaces the previous deterministic-hash placeholder implementation. Uses Feign
+ * clients (with fallbacks) so a downstream service outage degrades gracefully:
+ * the metric for that area shows zeros instead of failing the whole report.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
 public class ReportServiceImpl implements ReportService {
+
     private final ReportRepository reportRepository;
+    private final CaseServiceClient caseClient;
+    private final HearingServiceClient hearingClient;
+    private final WorkflowServiceClient workflowClient;
+    private final AppealServiceClient appealClient;
+    private final ComplianceServiceClient complianceClient;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     @Override
-    public ReportResponse generateReport(ReportRequest request) {
-        validateRequest(request);
+    public ReportResponse generateReport(ReportRequest request, String requestedBy) {
+        validateRequest(request, requestedBy);
 
-        String normalizedScopeValue = request.getScopeValue().trim();
-        String metrics = buildMetricsJson(request.getScope(), normalizedScopeValue);
+        String normalizedScopeValue = request.getScopeValue() == null
+                ? "ALL"
+                : request.getScopeValue().trim();
+        if (normalizedScopeValue.isBlank()) normalizedScopeValue = "ALL";
+
+        Map<String, Object> metrics = aggregateMetrics(
+                request.getScope(), normalizedScopeValue, request.getDateFrom(), request.getDateTo());
+
+        String metricsJson;
+        try {
+            metricsJson = MAPPER.writeValueAsString(metrics);
+        } catch (JsonProcessingException e) {
+            throw new BadRequestException("Failed to serialize metrics: " + e.getMessage());
+        }
 
         Report report = Report.builder()
                 .scope(request.getScope())
                 .scopeValue(normalizedScopeValue)
-                .metrics(metrics)
+                .metrics(metricsJson)
                 .generatedDate(LocalDate.now())
-                .requestedBy(request.getRequestedBy())
+                .requestedBy(requestedBy)
+                .dateFrom(request.getDateFrom())
+                .dateTo(request.getDateTo())
                 .build();
 
-        Report savedReport = reportRepository.save(report);
-        log.info("Generated {} report for scopeValue={} by requestedBy={}",
-                savedReport.getScope(), savedReport.getScopeValue(), savedReport.getRequestedBy());
+        Report saved = reportRepository.save(report);
+        log.info("Generated {} report #{} for scopeValue={} by {}",
+                saved.getScope(), saved.getReportId(), saved.getScopeValue(), saved.getRequestedBy());
 
-        return toResponse(savedReport);
+        return toResponse(saved);
     }
 
     @Override
@@ -54,140 +107,401 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ReportResponse> getReportsByAdmin(Long id) {
-        return reportRepository.findByRequestedBy(id).stream().map(this::toResponse).toList();
+    public List<ReportResponse> getReportsByUser(String userId) {
+        return reportRepository.findByRequestedByOrderByGeneratedDateDesc(userId)
+                .stream().map(this::toResponse).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ReportResponse> getReportsByScope(Report.ReportScope scope) {
-        return reportRepository.findByScope(scope).stream().map(this::toResponse).toList();
+    public List<ReportResponse> getReportsByScope(ReportScope scope) {
+        return reportRepository.findByScopeOrderByGeneratedDateDesc(scope)
+                .stream().map(this::toResponse).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ReportResponse> getReportsByScopeAndValue(Report.ReportScope scope, String scopeValue) {
+    public List<ReportResponse> getReportsByScopeAndValue(ReportScope scope, String scopeValue) {
         if (scopeValue == null || scopeValue.isBlank()) {
             throw new BadRequestException("scopeValue must not be blank");
         }
-        return reportRepository.findByScopeAndScopeValue(scope, scopeValue.trim()).stream()
-                .map(this::toResponse)
-                .toList();
+        return reportRepository.findByScopeAndScopeValue(scope, scopeValue.trim())
+                .stream().map(this::toResponse).toList();
     }
 
-    private void validateRequest(ReportRequest request) {
-        if (request.getRequestedBy() == null || request.getRequestedBy() <= 0) {
-            throw new BadRequestException("requestedBy must be a positive number");
+    // ─────────────────────────────────────────────────────────────────────────
+    // Aggregation
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * "Narrowing" scopes filter strictly to a specific entity (judge / lawyer / single case).
+     * If the case set is empty for a narrowing scope, downstream data must also be empty —
+     * we must NOT fall back to system-wide queries.
+     *
+     * "System-wide" scopes (COURT / PERIOD / CLERK / COMPLIANCE) include all data unless
+     * a date range filter narrows it.
+     */
+    private boolean isNarrowingScope(ReportScope scope) {
+        return scope == ReportScope.JUDGE
+            || scope == ReportScope.LAWYER
+            || scope == ReportScope.CASE;
+    }
+
+    private Map<String, Object> aggregateMetrics(
+            ReportScope scope, String scopeValue, LocalDate dateFrom, LocalDate dateTo) {
+
+        // 1. Determine the case set for this report based on scope + scopeValue
+        List<CaseDto> cases = resolveCasesForScope(scope, scopeValue);
+
+        // 2. Apply date range filter (if provided) on filed dates
+        if (dateFrom != null || dateTo != null) {
+            cases = cases.stream()
+                    .filter(c -> withinRange(c.getFiledDate(), dateFrom, dateTo))
+                    .toList();
+        }
+
+        List<Long> caseIds = cases.stream().map(CaseDto::getCaseId).filter(Objects::nonNull).toList();
+        boolean narrowing = isNarrowingScope(scope);
+
+        // ── 3. Hearings ─────────────────────────────────────────────────────
+        List<HearingDto> hearings;
+        if (narrowing && caseIds.isEmpty()) {
+            // Narrowing scope with no cases → no hearings either (do NOT over-fetch system-wide)
+            hearings = List.of();
+        } else {
+            hearings = safeList(hearingClient::getAllHearings).stream()
+                    .filter(h -> caseIds.isEmpty() || caseIds.contains(h.getCaseId()))
+                    .filter(h -> withinRange(h.getHearingDate(), dateFrom, dateTo))
+                    .toList();
+            // Extra safety filter for JUDGE scope — hearings must belong to that judge too
+            if (scope == ReportScope.JUDGE) {
+                Long judgeId = parseLongOrNull(scopeValue);
+                if (judgeId != null) {
+                    hearings = hearings.stream().filter(h -> judgeId.equals(h.getJudgeId())).toList();
+                }
+            }
+        }
+
+        // ── 4. Documents (per-case fan-out — no "all docs" endpoint exists) ─
+        List<DocumentDto> documents = new ArrayList<>();
+        for (Long caseId : caseIds) {
+            try {
+                documents.addAll(caseClient.getDocumentsByCase(caseId));
+            } catch (Exception e) {
+                log.warn("Skipping documents for case #{}: {}", caseId, e.getMessage());
+            }
+        }
+
+        // ── 5. SLA records ──────────────────────────────────────────────────
+        List<SLARecordDto> slaRecords = new ArrayList<>();
+        if (!caseIds.isEmpty()) {
+            for (Long caseId : caseIds) {
+                try {
+                    slaRecords.addAll(workflowClient.getSlaRecordsByCase(caseId));
+                } catch (Exception e) {
+                    log.warn("Skipping SLA for case #{}: {}", caseId, e.getMessage());
+                }
+            }
+        } else if (!narrowing) {
+            // Only fall back to system-wide SLA if the scope is NOT narrowing
+            slaRecords.addAll(safeList(workflowClient::getActiveSlas));
+            slaRecords.addAll(safeList(workflowClient::getBreachedSlas));
+        }
+
+        // ── 6. Appeals ──────────────────────────────────────────────────────
+        List<AppealDto> appeals;
+        if (narrowing && caseIds.isEmpty()) {
+            appeals = List.of();
+        } else if (caseIds.isEmpty()) {
+            // System-wide scope: pull a large page
+            PageResponse<AppealDto> pg = appealClient.getAppealsPaginated(0, 1000);
+            appeals = pg != null && pg.getContent() != null ? pg.getContent() : List.of();
+        } else {
+            appeals = new ArrayList<>();
+            for (Long caseId : caseIds) {
+                try {
+                    appeals.addAll(appealClient.getAppealsByCase(caseId));
+                } catch (Exception e) {
+                    log.warn("Skipping appeals for case #{}: {}", caseId, e.getMessage());
+                }
+            }
+        }
+        appeals = appeals.stream()
+                .filter(a -> withinRange(a.getFiledDate(), dateFrom, dateTo))
+                .toList();
+
+        // ── 7. Reviews ──────────────────────────────────────────────────────
+        List<ReviewDto> reviews = new ArrayList<>();
+        if (scope == ReportScope.JUDGE) {
+            Long judgeId = parseLongOrNull(scopeValue);
+            if (judgeId != null) {
+                reviews.addAll(safeList(() -> appealClient.getReviewsByJudge(judgeId)));
+            }
+        } else if (!caseIds.isEmpty()) {
+            for (Long caseId : caseIds) {
+                try {
+                    reviews.addAll(appealClient.getReviewsByCase(caseId));
+                } catch (Exception e) {
+                    log.warn("Skipping reviews for case #{}: {}", caseId, e.getMessage());
+                }
+            }
+        }
+        // narrowing scopes with empty caseIds → reviews stays empty (correct)
+
+        // ── 8. Compliance records ───────────────────────────────────────────
+        List<ComplianceRecordDto> compliance;
+        if (narrowing && caseIds.isEmpty()) {
+            compliance = List.of();
+        } else {
+            PageResponse<ComplianceRecordDto> compPg = complianceClient.getCompliancePaginated(0, 1000);
+            compliance = compPg != null && compPg.getContent() != null ? compPg.getContent() : List.of();
+            if (!caseIds.isEmpty()) {
+                compliance = compliance.stream().filter(c -> caseIds.contains(c.getCaseId())).toList();
+            }
+            compliance = compliance.stream()
+                    .filter(c -> withinRange(c.getDate(), dateFrom, dateTo))
+                    .toList();
+        }
+
+        // ── 9. Build metrics map ────────────────────────────────────────────
+        return buildMetrics(scope, scopeValue, dateFrom, dateTo,
+                cases, documents, hearings, slaRecords, appeals, reviews, compliance);
+    }
+
+    private List<CaseDto> resolveCasesForScope(ReportScope scope, String scopeValue) {
+        try {
+            switch (scope) {
+                case CASE: {
+                    Long caseId = parseLongOrNull(scopeValue);
+                    if (caseId == null) return List.of();
+                    CaseDto c = caseClient.getCaseById(caseId);
+                    return c == null ? List.of() : List.of(c);
+                }
+                case JUDGE: {
+                    // case-service has no "by judge" endpoint, so we filter all cases by judgeId
+                    Long judgeId = parseLongOrNull(scopeValue);
+                    List<CaseDto> all = caseClient.getAllCases();
+                    if (judgeId == null) return all;
+                    return all.stream().filter(c -> judgeId.equals(c.getJudgeId())).toList();
+                }
+                case CLERK: {
+                    // No direct "by clerk" — return all cases (clerk works system-wide)
+                    return caseClient.getAllCases();
+                }
+                case LAWYER: {
+                    if (scopeValue == null || scopeValue.isBlank() || "ALL".equalsIgnoreCase(scopeValue)) {
+                        return caseClient.getAllCases();
+                    }
+                    return caseClient.getCasesByLawyer(scopeValue);
+                }
+                case COURT, PERIOD, COMPLIANCE:
+                default:
+                    return caseClient.getAllCases();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to resolve cases for scope={} value={}: {}", scope, scopeValue, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private Map<String, Object> buildMetrics(
+            ReportScope scope, String scopeValue, LocalDate dateFrom, LocalDate dateTo,
+            List<CaseDto> cases, List<DocumentDto> documents, List<HearingDto> hearings,
+            List<SLARecordDto> slaRecords, List<AppealDto> appeals, List<ReviewDto> reviews,
+            List<ComplianceRecordDto> compliance) {
+
+        // Cases
+        int totalCasesFiled = cases.size();
+        int casesActive    = (int) cases.stream().filter(c -> equalsAny(c.getStatus(), "ACTIVE", "FILED", "UNDER_REVIEW", "HEARING_SCHEDULED")).count();
+        int casesClosed    = (int) cases.stream().filter(c -> equalsAny(c.getStatus(), "CLOSED", "DECIDED")).count();
+        int casesAdjourned = (int) cases.stream().filter(c -> equalsAny(c.getStatus(), "ADJOURNED")).count();
+        int casesAppealed  = (int) cases.stream().filter(c -> equalsAny(c.getStatus(), "APPEALED")).count();
+
+        // Documents
+        int totalDocuments    = documents.size();
+        int documentVerified  = (int) documents.stream().filter(d -> equalsAny(d.getVerificationStatus(), "VERIFIED")).count();
+        int documentRejected  = (int) documents.stream().filter(d -> equalsAny(d.getVerificationStatus(), "REJECTED")).count();
+        int documentPending   = (int) documents.stream().filter(d -> equalsAny(d.getVerificationStatus(), "PENDING")).count();
+
+        // Hearings
+        int totalHearings        = hearings.size();
+        int hearingsCompleted    = (int) hearings.stream().filter(h -> equalsAny(h.getStatus(), "COMPLETED")).count();
+        int hearingsScheduled    = (int) hearings.stream().filter(h -> equalsAny(h.getStatus(), "SCHEDULED")).count();
+        int hearingsRescheduled  = (int) hearings.stream().filter(h -> equalsAny(h.getStatus(), "RESCHEDULED")).count();
+        int hearingsCancelled    = (int) hearings.stream().filter(h -> equalsAny(h.getStatus(), "CANCELLED")).count();
+
+        // SLA
+        int totalSlaRecords = slaRecords.size();
+        int slaBreaches     = (int) slaRecords.stream().filter(s -> equalsAny(s.getStatus(), "BREACHED")).count();
+        int slaWarnings     = (int) slaRecords.stream().filter(s -> equalsAny(s.getStatus(), "WARNING")).count();
+        int slaActive       = (int) slaRecords.stream().filter(s -> equalsAny(s.getStatus(), "ACTIVE")).count();
+        int slaClosed       = (int) slaRecords.stream().filter(s -> equalsAny(s.getStatus(), "CLOSED", "COMPLETED", "ON_TIME")).count();
+
+        // Appeals
+        int totalAppeals       = appeals.size();
+        int appealsFiled       = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "FILED")).count();
+        int appealsUnderReview = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "UNDER_REVIEW")).count();
+        int appealsDecided     = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "DECISION_ISSUED", "CLOSED")).count();
+        // Distinct cases that have at least one appeal — used for the % rate (caps at 100%)
+        int casesWithAppeals   = (int) appeals.stream()
+                .map(AppealDto::getCaseId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+
+        // Review outcomes
+        int upheld     = (int) reviews.stream().filter(r -> equalsAny(r.getOutcome(), "UPHELD", "APPEAL_UPHELD")).count();
+        int reversed   = (int) reviews.stream().filter(r -> equalsAny(r.getOutcome(), "REVERSED")).count();
+        int modified   = (int) reviews.stream().filter(r -> equalsAny(r.getOutcome(), "MODIFIED", "PARTIALLY_UPHELD")).count();
+        int sentBack   = (int) reviews.stream().filter(r -> equalsAny(r.getOutcome(), "SENT_BACK", "REMANDED", "RETRIAL_ORDERED")).count();
+        int dismissed  = (int) reviews.stream().filter(r -> equalsAny(r.getOutcome(), "APPEAL_DISMISSED", "DISMISSED")).count();
+
+        // Compliance
+        int totalCompliance      = compliance.size();
+        int compliancePass       = (int) compliance.stream().filter(c -> equalsAny(c.getResult(), "PASS")).count();
+        int complianceFail       = (int) compliance.stream().filter(c -> equalsAny(c.getResult(), "FAIL")).count();
+        int complianceDocFails   = (int) compliance.stream().filter(c -> equalsAny(c.getResult(), "FAIL") && equalsAny(c.getType(), "DOCUMENT")).count();
+        int complianceProcFails  = (int) compliance.stream().filter(c -> equalsAny(c.getResult(), "FAIL") && equalsAny(c.getType(), "PROCESS")).count();
+
+        // Rates
+        double caseClearanceRate         = percentage(casesClosed, totalCasesFiled);
+        double documentVerificationRate  = percentage(documentVerified, totalDocuments);
+        double documentRejectionRate     = percentage(documentRejected, totalDocuments);
+        double hearingCompletionRate     = percentage(hearingsCompleted, totalHearings);
+        double slaAdherenceRate          = percentage(totalSlaRecords - slaBreaches, totalSlaRecords);
+        // % of cases that have been appealed at least once — naturally capped at 100%
+        double appealRate                = percentage(casesWithAppeals, totalCasesFiled);
+        // Average number of appeals filed per case (can exceed 1.0 if a case has multiple appeals)
+        double appealsPerCase            = totalCasesFiled > 0
+                ? java.math.BigDecimal.valueOf((double) totalAppeals / totalCasesFiled)
+                        .setScale(2, java.math.RoundingMode.HALF_UP).doubleValue()
+                : 0.0;
+        double compliancePassRate        = percentage(compliancePass, totalCompliance);
+
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("scope", scope.name());
+        root.put("scopeValue", scopeValue);
+        root.put("dateFrom", dateFrom);
+        root.put("dateTo", dateTo);
+        root.put("generatedAt", LocalDate.now());
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalCasesFiled", totalCasesFiled);
+        summary.put("casesActive",     casesActive);
+        summary.put("casesClosed",     casesClosed);
+        summary.put("casesAdjourned",  casesAdjourned);
+        summary.put("casesAppealed",   casesAppealed);
+        summary.put("caseClearanceRate", caseClearanceRate);
+        root.put("summary", summary);
+
+        Map<String, Object> docs = new LinkedHashMap<>();
+        docs.put("totalDocuments",          totalDocuments);
+        docs.put("verifiedDocuments",       documentVerified);
+        docs.put("rejectedDocuments",       documentRejected);
+        docs.put("pendingDocuments",        documentPending);
+        docs.put("documentVerificationRate", documentVerificationRate);
+        docs.put("documentRejectionRate",    documentRejectionRate);
+        root.put("documents", docs);
+
+        Map<String, Object> hr = new LinkedHashMap<>();
+        hr.put("totalHearings",       totalHearings);
+        hr.put("hearingsCompleted",   hearingsCompleted);
+        hr.put("hearingsScheduled",   hearingsScheduled);
+        hr.put("hearingsRescheduled", hearingsRescheduled);
+        hr.put("hearingsCancelled",   hearingsCancelled);
+        hr.put("hearingCompletionRate", hearingCompletionRate);
+        root.put("hearings", hr);
+
+        Map<String, Object> sla = new LinkedHashMap<>();
+        sla.put("totalSlaRecords", totalSlaRecords);
+        sla.put("slaBreaches",     slaBreaches);
+        sla.put("slaWarnings",     slaWarnings);
+        sla.put("slaActive",       slaActive);
+        sla.put("slaClosed",       slaClosed);
+        sla.put("slaAdherenceRate", slaAdherenceRate);
+        root.put("sla", sla);
+
+        Map<String, Object> ap = new LinkedHashMap<>();
+        ap.put("totalAppeals",       totalAppeals);
+        ap.put("appealsFiled",       appealsFiled);
+        ap.put("appealsUnderReview", appealsUnderReview);
+        ap.put("appealsDecided",     appealsDecided);
+        ap.put("casesWithAppeals",   casesWithAppeals);
+        ap.put("appealRate",         appealRate);          // % of cases appealed (≤ 100%)
+        ap.put("appealsPerCase",     appealsPerCase);      // avg appeals per case (can exceed 1.0)
+        Map<String, Object> outcomes = new LinkedHashMap<>();
+        outcomes.put("upheld",    upheld);
+        outcomes.put("reversed",  reversed);
+        outcomes.put("modified",  modified);
+        outcomes.put("sentBack",  sentBack);
+        outcomes.put("dismissed", dismissed);
+        ap.put("outcomes", outcomes);
+        root.put("appeals", ap);
+
+        Map<String, Object> co = new LinkedHashMap<>();
+        co.put("totalComplianceChecks",     totalCompliance);
+        co.put("compliancePasses",          compliancePass);
+        co.put("complianceFailures",        complianceFail);
+        co.put("complianceDocumentFailures", complianceDocFails);
+        co.put("complianceProcessFailures",  complianceProcFails);
+        co.put("compliancePassRate",        compliancePassRate);
+        root.put("compliance", co);
+
+        return root;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private void validateRequest(ReportRequest request, String requestedBy) {
+        if (requestedBy == null || requestedBy.isBlank()) {
+            throw new BadRequestException("Missing authentication — requestedBy could not be resolved");
         }
         if (request.getScope() == null) {
             throw new BadRequestException("scope must not be null");
         }
-        if (request.getScopeValue() == null || request.getScopeValue().isBlank()) {
-            throw new BadRequestException("scopeValue must not be blank");
+        if (request.getDateFrom() != null && request.getDateTo() != null
+                && request.getDateFrom().isAfter(request.getDateTo())) {
+            throw new BadRequestException("dateFrom must be on or before dateTo");
         }
     }
 
-    private String buildMetricsJson(Report.ReportScope scope, String scopeValue) {
-        long seed = Math.abs((scope.name() + ":" + scopeValue.toLowerCase()).hashCode());
-
-        int totalCasesFiled = bounded(seed, 120, 280);
-        int casesClosed = bounded(seed / 3, 45, Math.max(46, totalCasesFiled - 25));
-        int casesAdjourned = bounded(seed / 5, 8, Math.max(9, totalCasesFiled / 5));
-        int casesActive = Math.max(totalCasesFiled - casesClosed - casesAdjourned, 0);
-
-        int totalDocuments = bounded(seed / 7, totalCasesFiled * 2, totalCasesFiled * 4);
-        int documentVerified = bounded(seed / 11, (int) (totalDocuments * 0.55), (int) (totalDocuments * 0.85));
-        int documentRejected = bounded(seed / 13, (int) (totalDocuments * 0.05), (int) (totalDocuments * 0.20));
-        if (documentVerified + documentRejected > totalDocuments) {
-            documentRejected = Math.max(totalDocuments - documentVerified, 0);
-        }
-
-        int totalHearingsScheduled = bounded(seed / 17, totalCasesFiled / 2, totalCasesFiled);
-        int hearingsCompleted = bounded(seed / 19, (int) (totalHearingsScheduled * 0.55), (int) (totalHearingsScheduled * 0.90));
-        int hearingsRescheduled = Math.max(totalHearingsScheduled - hearingsCompleted, 0);
-
-        int totalSlaRecords = bounded(seed / 23, totalCasesFiled / 2, totalCasesFiled);
-        int slaBreaches = bounded(seed / 29, 2, Math.max(3, totalSlaRecords / 6));
-        int compliantRecords = Math.max(totalSlaRecords - slaBreaches, 0);
-
-        int totalAppeals = bounded(seed / 31, 4, Math.max(5, totalCasesFiled / 4));
-        int appealsUpheld = bounded(seed / 37, 1, Math.max(2, totalAppeals - 1));
-        int appealsDismissed = Math.max(totalAppeals - appealsUpheld, 0);
-
-        int totalComplianceChecks = bounded(seed / 41, totalCasesFiled / 3, totalCasesFiled / 2 + 10);
-        int compliancePasses = bounded(seed / 43, (int) (totalComplianceChecks * 0.60), totalComplianceChecks);
-        int complianceFailures = Math.max(totalComplianceChecks - compliancePasses, 0);
-
-        double documentVerificationRate = percentage(documentVerified, totalDocuments);
-        double documentRejectionRate = percentage(documentRejected, totalDocuments);
-        double caseClearanceRate = percentage(casesClosed, totalCasesFiled);
-        double hearingCompletionRate = percentage(hearingsCompleted, totalHearingsScheduled);
-        double slaAdherenceRate = percentage(compliantRecords, totalSlaRecords);
-        double appealRate = percentage(totalAppeals, totalCasesFiled);
-        double compliancePassRate = percentage(compliancePasses, totalComplianceChecks);
-
-        return new StringBuilder()
-                .append("{")
-                .append("\"scope\":\"").append(escape(scope.name())).append("\",")
-                .append("\"scopeValue\":\"").append(escape(scopeValue)).append("\",")
-                .append("\"summary\":{")
-                .append("\"totalCasesFiled\":").append(totalCasesFiled).append(',')
-                .append("\"casesActive\":").append(casesActive).append(',')
-                .append("\"casesClosed\":").append(casesClosed).append(',')
-                .append("\"casesAdjourned\":").append(casesAdjourned).append('}')
-                .append(',')
-                .append("\"documents\":{")
-                .append("\"totalDocuments\":").append(totalDocuments).append(',')
-                .append("\"verifiedDocuments\":").append(documentVerified).append(',')
-                .append("\"rejectedDocuments\":").append(documentRejected).append(',')
-                .append("\"documentVerificationRate\":").append(documentVerificationRate).append(',')
-                .append("\"documentRejectionRate\":").append(documentRejectionRate).append('}')
-                .append(',')
-                .append("\"hearings\":{")
-                .append("\"totalHearingsScheduled\":").append(totalHearingsScheduled).append(',')
-                .append("\"hearingsCompleted\":").append(hearingsCompleted).append(',')
-                .append("\"hearingsRescheduled\":").append(hearingsRescheduled).append(',')
-                .append("\"hearingCompletionRate\":").append(hearingCompletionRate).append('}')
-                .append(',')
-                .append("\"sla\":{")
-                .append("\"totalSlaRecords\":").append(totalSlaRecords).append(',')
-                .append("\"slaBreaches\":").append(slaBreaches).append(',')
-                .append("\"slaAdherenceRate\":").append(slaAdherenceRate).append('}')
-                .append(',')
-                .append("\"appeals\":{")
-                .append("\"totalAppeals\":").append(totalAppeals).append(',')
-                .append("\"appealsUpheld\":").append(appealsUpheld).append(',')
-                .append("\"appealsDismissed\":").append(appealsDismissed).append(',')
-                .append("\"appealRate\":").append(appealRate).append('}')
-                .append(',')
-                .append("\"compliance\":{")
-                .append("\"totalComplianceChecks\":").append(totalComplianceChecks).append(',')
-                .append("\"compliancePasses\":").append(compliancePasses).append(',')
-                .append("\"complianceFailures\":").append(complianceFailures).append(',')
-                .append("\"compliancePassRate\":").append(compliancePassRate).append('}')
-                .append("}")
-                .toString();
+    private boolean withinRange(LocalDate date, LocalDate from, LocalDate to) {
+        if (date == null) return true; // don't drop records that lack a date
+        if (from != null && date.isBefore(from)) return false;
+        if (to   != null && date.isAfter(to))    return false;
+        return true;
     }
 
-    private int bounded(long seed, int min, int max) {
-        if (max < min) {
-            return min;
+    private boolean equalsAny(String value, String... candidates) {
+        if (value == null) return false;
+        for (String c : candidates) {
+            if (c.equalsIgnoreCase(value)) return true;
         }
-        int range = max - min + 1;
-        return min + (int) (seed % range);
+        return false;
+    }
+
+    private Long parseLongOrNull(String s) {
+        if (s == null || s.isBlank()) return null;
+        try { return Long.parseLong(s.trim()); } catch (NumberFormatException e) { return null; }
     }
 
     private double percentage(int value, int total) {
-        if (total <= 0) {
-            return 0.0;
-        }
+        if (total <= 0) return 0.0;
         return BigDecimal.valueOf((value * 100.0) / total)
                 .setScale(2, RoundingMode.HALF_UP)
                 .doubleValue();
     }
 
-    private String escape(String value) {
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    private <T> List<T> safeList(java.util.function.Supplier<List<T>> call) {
+        try {
+            List<T> result = call.get();
+            return result == null ? List.of() : result;
+        } catch (Exception e) {
+            log.warn("Downstream call failed: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private ReportResponse toResponse(Report r) {
@@ -198,6 +512,8 @@ public class ReportServiceImpl implements ReportService {
                 .metrics(r.getMetrics())
                 .generatedDate(r.getGeneratedDate())
                 .requestedBy(r.getRequestedBy())
+                .dateFrom(r.getDateFrom())
+                .dateTo(r.getDateTo())
                 .build();
     }
 }

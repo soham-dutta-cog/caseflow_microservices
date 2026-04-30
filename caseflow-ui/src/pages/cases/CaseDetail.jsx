@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { cases, hearings, appeals, compliance, workflow } from '../../api/services'
-import { CASE_STATUS, DOC_TYPES, DOC_VERIFICATION, statusBadgeClass, formatDate, formatDateTime } from '../../utils/constants'
+import { CASE_STATUS, DOC_TYPES, DOC_VERIFICATION, REVIEW_OUTCOME_LABELS, statusBadgeClass, formatDate, formatDateTime } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../api/client'
 
@@ -12,6 +12,7 @@ export default function CaseDetail() {
   const [docs, setDocs] = useState([])
   const [hrgs, setHrgs] = useState([])
   const [apps, setApps] = useState([])
+  const [appealReviews, setAppealReviews] = useState([])
   const [compl, setCompl] = useState([])
   const [stages, setStages] = useState([])
   const [err, setErr] = useState('')
@@ -22,13 +23,15 @@ export default function CaseDetail() {
   const load = async () => {
     setErr('')
     try {
-      const [cs, ds, hs, as, cm, st] = await Promise.allSettled([
+      const canLoadReviews = ['ADMIN', 'CLERK', 'JUDGE'].includes(user?.role)
+      const [cs, ds, hs, as, cm, st, rv] = await Promise.allSettled([
         cases.get(caseId),
         cases.docs(caseId),
         hearings.byCase(caseId),
         appeals.byCase(caseId),
         compliance.byCase(caseId),
         workflow.stages(caseId),
+        canLoadReviews ? appeals.reviewsByCase(caseId) : Promise.resolve([]),
       ])
       if (cs.status === 'fulfilled') setCase(cs.value)
       if (ds.status === 'fulfilled') setDocs(ds.value || [])
@@ -36,6 +39,7 @@ export default function CaseDetail() {
       if (as.status === 'fulfilled') setApps(as.value || [])
       if (cm.status === 'fulfilled') setCompl(cm.value || [])
       if (st.status === 'fulfilled') setStages(st.value || [])
+      if (rv.status === 'fulfilled') setAppealReviews(rv.value || [])
       if (cs.status === 'rejected') setErr(cs.reason.message)
     } catch (e) { setErr(e.message) }
   }
@@ -103,7 +107,11 @@ export default function CaseDetail() {
     </div>
   )
 
-  const canUpload = ['LITIGANT', 'LAWYER', 'CLERK', 'ADMIN'].includes(user?.role)
+  const canUpload = (
+    user?.role === 'ADMIN' ||
+    (user?.role === 'LAWYER' && c.lawyerId && (c.lawyerId === user?.userId || c.lawyerId === user?.email)) ||
+    (user?.role === 'LITIGANT' && !c.lawyerId)
+  )
   const canVerify = ['CLERK', 'ADMIN'].includes(user?.role)
   const canUpdateStatus = ['CLERK', 'JUDGE', 'ADMIN'].includes(user?.role)
 
@@ -113,7 +121,9 @@ export default function CaseDetail() {
         <h1 className="page-title h3 mb-0">Case #{c.caseId}: {c.title}</h1>
         <div className="d-flex gap-2 flex-wrap">
           {['ADMIN','CLERK'].includes(user?.role) && <Link to={`/workflow/${c.caseId}`} className="btn btn-outline-secondary btn-sm">Workflow</Link>}
-          <Link to={`/appeals/file?caseId=${c.caseId}`} className="btn btn-outline-secondary btn-sm">File Appeal</Link>
+          {['LITIGANT','LAWYER','ADMIN'].includes(user?.role) && c.status === 'CLOSED' && (
+            <Link to={`/appeals/file?caseId=${c.caseId}`} className="btn btn-outline-secondary btn-sm">File Appeal</Link>
+          )}
         </div>
       </div>
       {err && <div className="alert alert-danger py-2">{err}</div>}
@@ -285,6 +295,48 @@ export default function CaseDetail() {
           )}
         </div>
       </div>
+
+      {['ADMIN', 'CLERK', 'JUDGE'].includes(user?.role) && (
+        <div className="card shadow-sm mb-3">
+          <div className="card-body">
+            <h3 className="h5 mb-3">Appeal Reviews</h3>
+            {appealReviews.length === 0 ? (
+              <div className="text-center text-muted py-4">No reviews recorded for this case</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Review</th><th>Appeal</th><th>Judge</th>
+                      <th>Assigned</th><th>Outcome</th><th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appealReviews.map(r => (
+                      <tr key={r.reviewId}>
+                        <td>#{r.reviewId}</td>
+                        <td><Link to={`/appeals/${r.appealId}`}>#{r.appealId}</Link></td>
+                        <td>{r.judgeId}</td>
+                        <td>{formatDateTime(r.reviewDate)}</td>
+                        <td>
+                          {r.outcome ? (
+                            <span className={`badge rounded-pill ${statusBadgeClass(r.outcome)}`}>
+                              {REVIEW_OUTCOME_LABELS[r.outcome] || r.outcome}
+                            </span>
+                          ) : (
+                            <span className="badge rounded-pill text-bg-warning">Pending</span>
+                          )}
+                        </td>
+                        <td><Link to={`/appeals/${r.appealId}`} className="btn btn-outline-secondary btn-sm">Open</Link></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="card shadow-sm mb-3">
         <div className="card-body">

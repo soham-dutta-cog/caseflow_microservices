@@ -164,7 +164,7 @@ export default function Home() {
                 so legal teams can focus on justice, not paperwork.
               </p>
               <div className="animate-in animate-in-delay-3 d-flex flex-column flex-sm-row gap-3 justify-content-center justify-content-lg-start mb-5">
-                <Link to="/login" className="btn btn-gold btn-lg">Get Started Free</Link>
+                <Link to="/login" className="btn btn-gold btn-lg">Get Started</Link>
                 <a href="#modules" className="btn btn-outline-light rounded-pill">Explore Modules</a>
               </div>
             </div>

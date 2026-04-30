@@ -102,9 +102,9 @@ public class UserService {
             throw new BadRequestException("Only @gmail.com email addresses are allowed for non-admin users");
         if (user.getStatus() == User.Status.INACTIVE)
             throw new InvalidOperationException("User account is inactive");
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name(), user.getUserId());
         auditLogService.log(user.getUserId(), "USER_LOGIN", "User:" + user.getUserId());
-        return new LoginResponse(token, user.getRole().name(), user.getName(), user.getEmail());
+        return new LoginResponse(token, user.getRole().name(), user.getName(), user.getEmail(), user.getUserId());
     }
 
     public String changePassword(ChangePasswordRequest request) {
@@ -119,6 +119,19 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
         return "Password changed successfully";
+    }
+
+    public List<UserResponse> getUsersByRole(String roleName) {
+        User.Role role;
+        try { role = User.Role.valueOf(roleName.toUpperCase()); }
+        catch (IllegalArgumentException e) { throw new BadRequestException("Invalid role: " + roleName); }
+        return userRepository.findByRoleAndStatus(role, User.Status.ACTIVE)
+            .stream().map(this::mapToResponse).toList();
+    }
+
+    public UserResponse getCurrentUser(String email) {
+        return mapToResponse(userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found")));
     }
 
     public List<UserResponse> getAllUsers() {

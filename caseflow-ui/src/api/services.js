@@ -3,6 +3,7 @@ import { api } from './client'
 export const auth = {
   register: (data) => api.post('/api/auth/register', data),
   login: (data, rememberMe = false) => api.post(`/api/auth/login?rememberMe=${rememberMe}`, data),
+  me: () => api.get('/api/auth/me'),
   changePassword: (data) => api.put('/api/auth/change-password', data),
   forgotPassword: (data) => api.post('/api/auth/forgot-password', data),
   resetPassword: (data) => api.post('/api/auth/reset-password', data),
@@ -13,6 +14,7 @@ export const users = {
   create: (data) => api.post('/api/users/create', data),
   list: () => api.get('/api/users'),
   get: (id) => api.get(`/api/users/${id}`),
+  byRole: (role) => api.get(`/api/users/role/${role}`),
   setStatus: (id, status) => api.patch(`/api/users/${id}/status?status=${status}`),
   resetPassword: (id, newPassword) => api.put(`/api/users/${id}/reset-password?newPassword=${encodeURIComponent(newPassword)}`),
   auditLogs: () => api.get('/api/users/audit-logs'),
@@ -72,32 +74,62 @@ export const workflow = {
 }
 
 export const appeals = {
-  file: (data) => api.post('/api/appeals', data),
-  get: (id) => api.get(`/api/appeals/${id}`),
-  byCase: (caseId) => api.get(`/api/appeals/case/${caseId}`),
-  byUser: (userId) => api.get(`/api/appeals/user/${userId}`),
-  byStatus: (status) => api.get(`/api/appeals/status/${status}`),
-  openReview: (id, judgeId) => api.post(`/api/appeals/${id}/review?judgeId=${judgeId}`),
-  getReview: (id) => api.get(`/api/appeals/${id}/review`),
-  decide: (id, judgeId, data) => api.post(`/api/appeals/${id}/decide?judgeId=${judgeId}`, data),
-  reviewsByCase: (caseId) => api.get(`/api/appeals/reviews/case/${caseId}`),
-  reviewsByJudge: (judgeId) => api.get(`/api/appeals/reviews/judge/${judgeId}`),
-  updateOutcome: (reviewId, data) => api.patch(`/api/appeals/reviews/${reviewId}/outcome`, data),
-  paginated: (page = 0, size = 10, sort = 'appealId,desc') => api.get('/api/appeals/paginated', { page, size, sort }),
+  // Filing & lifecycle (caller does NOT send filedByUserId — backend resolves it from JWT)
+  file:   (data) => api.post('/api/appeals', data),
+  cancel: (id)   => api.patch(`/api/appeals/${id}/cancel`),
+
+  // Reads
+  get:       (id)      => api.get(`/api/appeals/${id}`),
+  mine:      ()        => api.get('/api/appeals/my'),
+  byCase:    (caseId)  => api.get(`/api/appeals/case/${caseId}`),
+  byUser:    (userId)  => api.get(`/api/appeals/user/${userId}`),
+  byStatus:  (status)  => api.get(`/api/appeals/status/${status}`),
+  paginated: (page = 0, size = 10, sort = 'appealId,desc') =>
+    api.get('/api/appeals/paginated', { page, size, sort }),
+
+  // Audit trail (filer or admin/clerk/judge)
+  audit: (id) => api.get(`/api/appeals/${id}/audit`),
+
+  // Reviews
+  openReview:     (id, judgeId)      => api.post(`/api/appeals/${id}/review?judgeId=${encodeURIComponent(judgeId)}`),
+  getReview:      (id)               => api.get(`/api/appeals/${id}/review`),
+  decide:         (id, data)         => api.post(`/api/appeals/${id}/decide`, data),
+  updateOutcome:  (reviewId, data)   => api.patch(`/api/appeals/reviews/${reviewId}/outcome`, data),
+  reviewsByCase:  (caseId)           => api.get(`/api/appeals/reviews/case/${caseId}`),
+  reviewsByJudge: (judgeId)          => api.get(`/api/appeals/reviews/judge/${judgeId}`),
+  myReviews:      ()                 => api.get('/api/appeals/reviews/my'),
+
+  // Documents (multipart upload)
+  uploadDoc:   (appealId, formData) => api.postForm(`/api/appeals/${appealId}/documents`, formData),
+  listDocs:    (appealId)           => api.get(`/api/appeals/${appealId}/documents`),
+  getDoc:      (docId)              => api.get(`/api/appeals/documents/${docId}`),
+  downloadDoc: (docId)              => api.raw(`/api/appeals/documents/${docId}/download`),
+  deleteDoc:   (docId)              => api.del(`/api/appeals/documents/${docId}`),
 }
 
 export const compliance = {
+  // Run automated compliance check — caseIds optional (empty = all cases)
+  runCheck: (data) => api.post('/api/compliance/check', data),
   byCase: (caseId) => api.get(`/api/compliance/case/${caseId}`),
+  complianceRecordsPaginated: (page = 0, size = 10) => api.get('/api/compliance/paginated', { page, size }),
+  // Audits
   createAudit: (data) => api.post('/api/audits', data),
   getAudit: (id) => api.get(`/api/audits/${id}`),
   updateFindings: (id, findings) => api.patch(`/api/audits/${id}/findings`, findings),
-  closeAudit: (id, adminId) => api.patch(`/api/audits/${id}/close?adminId=${adminId}`),
+  closeAudit: (id) => api.patch(`/api/audits/${id}/close`),   // adminId comes from JWT header
   auditsByAdmin: (adminId) => api.get(`/api/audits/admin/${adminId}`),
-  complianceRecordsPaginated: (page = 0, size = 10) => api.get('/api/compliance/paginated', { page, size }),
   auditsPaginated: (page = 0, size = 10) => api.get('/api/audits/paginated', { page, size }),
 }
 
 export const notifications = {
+  // ── Own notifications (works for ALL roles) ───────────────────────────────
+  my: () => api.get('/api/notifications/my'),
+  myUnread: () => api.get('/api/notifications/my/unread'),
+  myCount: () => api.get('/api/notifications/my/count'),
+  myMarkAllRead: () => api.patch('/api/notifications/my/read-all'),
+  myByCategory: (category) => api.get(`/api/notifications/my/category/${category}`),
+
+  // ── Admin / CLERK lookups (ADMIN + CLERK only) ────────────────────────────
   create: (data) => api.post('/api/notifications', data),
   get: (id) => api.get(`/api/notifications/${id}`),
   byUser: (userId) => api.get(`/api/notifications/user/${userId}`),
@@ -110,8 +142,10 @@ export const notifications = {
 }
 
 export const reports = {
+  // requestedBy is read from the JWT/X-Auth-User-Id header on the backend — do NOT send it
   generate: (data) => api.post('/api/reports', data),
   get: (id) => api.get(`/api/reports/${id}`),
+  mine: () => api.get('/api/reports/me'),
   byAdmin: (adminId) => api.get(`/api/reports/admin/${adminId}`),
   byScope: (scope) => api.get(`/api/reports/scope/${scope}`),
   byClerk: (clerkId) => api.get(`/api/reports/clerk/${clerkId}`),

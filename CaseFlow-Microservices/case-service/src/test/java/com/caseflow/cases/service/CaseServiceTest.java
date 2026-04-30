@@ -24,7 +24,7 @@ class CaseServiceTest {
     @InjectMocks private CaseService caseService;
 
     @Test void getCaseById_found() {
-        Case c = Case.builder().caseId(1L).title("Test Case").litigantId(1L)
+        Case c = Case.builder().caseId(1L).title("Test Case").litigantId("user-1")
             .filedDate(LocalDateTime.now()).status(Case.CaseStatus.FILED).build();
         when(caseRepository.findById(1L)).thenReturn(Optional.of(c));
         CaseResponse result = caseService.getCaseById(1L);
