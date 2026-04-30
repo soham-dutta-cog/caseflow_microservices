@@ -43,7 +43,9 @@ const NAV_GROUPS = [
     label: 'Legal Process',
     items: [
       { to: '/appeals', label: 'Appeals', icon: 'bi-arrow-repeat', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
-      { to: '/appeals/file', label: 'File Appeal', icon: 'bi-pencil-square', roles: ['LITIGANT'] },
+      { to: '/appeals/file', label: 'File Appeal', icon: 'bi-pencil-square', roles: ['LITIGANT', 'LAWYER', 'ADMIN'] },
+      { to: '/appeals/reviews/my', label: 'My Reviews', icon: 'bi-gavel', roles: ['JUDGE'] },
+      { to: '/appeals/reviews/judge', label: 'Lookup Judge', icon: 'bi-search', roles: ['CLERK', 'ADMIN'] },
       { to: '/workflow', label: 'Workflow / SLA', icon: 'bi-diagram-3', roles: ['ADMIN', 'CLERK', 'JUDGE'] },
     ],
   },
