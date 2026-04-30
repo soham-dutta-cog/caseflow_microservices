@@ -110,11 +110,11 @@ public class HearingService {
     }
     public List<HearingResponse> getAllHearings() { return hearingRepository.findAll().stream().map(this::mapToHearingResponse).toList(); }
     public List<HearingResponse> getHearingsByCase(Long id) { return hearingRepository.findByCaseId(id).stream().map(this::mapToHearingResponse).toList(); }
-    public List<HearingResponse> getHearingsByJudge(Long id) { return hearingRepository.findByJudgeId(id).stream().map(this::mapToHearingResponse).toList(); }
+    public List<HearingResponse> getHearingsByJudge(String id) { return hearingRepository.findByJudgeId(id).stream().map(this::mapToHearingResponse).toList(); }
     public List<HearingResponse> getHearingsByStatus(Hearing.HearingStatus s) { return hearingRepository.findByStatus(s).stream().map(this::mapToHearingResponse).toList(); }
-    public List<ScheduleResponse> getAvailableSlotsByJudge(Long id) { return scheduleRepository.findByJudgeIdAndAvailable(id, true).stream().map(this::mapToScheduleResponse).toList(); }
-    public List<ScheduleResponse> getSlotsByJudgeAndDate(Long id, java.time.LocalDate d) { return scheduleRepository.findByJudgeIdAndScheduleDate(id, d).stream().map(this::mapToScheduleResponse).toList(); }
-    public List<ScheduleResponse> getAllSlotsByJudge(Long id) { return scheduleRepository.findByJudgeId(id).stream().map(this::mapToScheduleResponse).toList(); }
+    public List<ScheduleResponse> getAvailableSlotsByJudge(String id) { return scheduleRepository.findByJudgeIdAndAvailable(id, true).stream().map(this::mapToScheduleResponse).toList(); }
+    public List<ScheduleResponse> getSlotsByJudgeAndDate(String id, java.time.LocalDate d) { return scheduleRepository.findByJudgeIdAndScheduleDate(id, d).stream().map(this::mapToScheduleResponse).toList(); }
+    public List<ScheduleResponse> getAllSlotsByJudge(String id) { return scheduleRepository.findByJudgeId(id).stream().map(this::mapToScheduleResponse).toList(); }
 
     private void sendNotification(String userId, Long caseId, String message, String category) {
         try {

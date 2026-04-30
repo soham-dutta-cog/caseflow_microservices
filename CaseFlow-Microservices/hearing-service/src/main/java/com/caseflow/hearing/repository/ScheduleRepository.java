@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
-    List<Schedule> findByJudgeId(Long judgeId);
-    List<Schedule> findByJudgeIdAndAvailable(Long judgeId, Boolean available);
-    List<Schedule> findByJudgeIdAndScheduleDate(Long judgeId, LocalDate date);
-    Optional<Schedule> findByJudgeIdAndScheduleDateAndTimeSlot(Long judgeId, LocalDate date, String timeSlot);
+    List<Schedule> findByJudgeId(String judgeId);
+    List<Schedule> findByJudgeIdAndAvailable(String judgeId, Boolean available);
+    List<Schedule> findByJudgeIdAndScheduleDate(String judgeId, LocalDate date);
+    Optional<Schedule> findByJudgeIdAndScheduleDateAndTimeSlot(String judgeId, LocalDate date, String timeSlot);
     Optional<Schedule> findByHearingId(Long hearingId);
 }

@@ -7,7 +7,7 @@ import java.time.LocalDate;
 public class Hearing {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) private Long hearingId;
     @Column(nullable = false) private Long caseId;
-    @Column(nullable = false) private Long judgeId;
+    @Column(nullable = false) private String judgeId;
     @Column(nullable = false) private LocalDate hearingDate;
     @Column(nullable = false) private String hearingTime;
     @Column(nullable = false) @Enumerated(EnumType.STRING) private HearingStatus status;

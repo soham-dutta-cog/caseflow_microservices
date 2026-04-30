@@ -8,13 +8,13 @@ import org.springframework.stereotype.Component;
 public class IamServiceFallback implements IamServiceClient {
 
     @Override
-    public Boolean existsById(Long id) {
+    public Boolean existsById(String id) {
         log.warn("CIRCUIT BREAKER: iam-service unavailable — existsById({}) returning true as fallback", id);
         return true;
     }
 
     @Override
-    public String getUserRole(Long id) {
+    public String getUserRole(String id) {
         log.warn("CIRCUIT BREAKER: iam-service unavailable — getUserRole({}) returning UNKNOWN", id);
         return "UNKNOWN";
     }
