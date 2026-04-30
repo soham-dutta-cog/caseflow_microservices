@@ -16,6 +16,7 @@ public class Case {
     @Column(nullable = false) private String litigantId;
     private String lawyerId;
     @Column(nullable = false) private LocalDateTime filedDate;
+    @Column(name = "closed_date") private LocalDateTime closedDate;
     @Column(nullable = false) @Enumerated(EnumType.STRING) private CaseStatus status;
     @Column(name = "case_type") private String caseType;
 

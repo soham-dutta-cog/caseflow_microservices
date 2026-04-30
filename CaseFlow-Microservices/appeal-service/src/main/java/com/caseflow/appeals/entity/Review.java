@@ -3,11 +3,12 @@ package com.caseflow.appeals.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "reviews")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -28,7 +29,7 @@ public class Review {
     private String judgeId;
 
     @Column(name = "review_date", nullable = false)
-    private LocalDate reviewDate;
+    private LocalDateTime reviewDate;
 
     @Enumerated(EnumType.STRING)
     @Column(length = 30)
@@ -36,6 +37,9 @@ public class Review {
 
     @Column(columnDefinition = "TEXT")
     private String remarks;
+
+    @Version
+    private Long version;
 
     public enum ReviewOutcome {APPEAL_UPHELD, APPEAL_DISMISSED, PARTIALLY_UPHELD, REMANDED, RETRIAL_ORDERED}
 }

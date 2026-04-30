@@ -19,19 +19,12 @@ public class CaseServiceFallback implements FallbackFactory<CaseServiceClient> {
             public CaseOwnerInfo getCaseDetails(Long caseId) {
                 log.warn("CIRCUIT BREAKER [getCaseDetails]: case-service unavailable for case #{} — cause: {}",
                     caseId, cause != null ? cause.getMessage() : "Unknown error");
-                return null; // null → caller treats this as service unavailable
-            }
-
-            @Override
-            public String getCaseStatus(Long caseId) {
-                log.warn("⚠️ CIRCUIT BREAKER ACTIVATED [getCaseStatus]: case-service unavailable for case #{} — cause: {}",
-                    caseId, cause != null ? cause.getMessage() : "Unknown error");
-                return "UNKNOWN";
+                return null;
             }
 
             @Override
             public Map<String, Object> updateCaseStatusInternal(Long caseId, String newStatus) {
-                log.error("🔴 CIRCUIT BREAKER ACTIVATED [updateCaseStatusInternal]: case-service unavailable — " +
+                log.error("CIRCUIT BREAKER [updateCaseStatusInternal]: case-service unavailable — " +
                           "case #{} status NOT updated to [{}]. Cause: {}", caseId, newStatus,
                           cause != null ? cause.getMessage() : "Unknown error");
                 return Map.of(

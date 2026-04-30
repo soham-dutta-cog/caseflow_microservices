@@ -8,11 +8,11 @@ import java.util.Map;
 
 /**
  * Feign client for inter-service communication with case-service.
- * 
- * Important: Feign automatically deserializes ResponseEntity<T> responses to the inner type T.
- * So when case-service returns ResponseEntity<CaseResponse>, Feign unmarshals it to 
- * LinkedHashMap (which implements Map<String, Object>).
- * 
+ *
+ * Feign deserializes the JSON body of HTTP responses; case-service returns
+ * ResponseEntity<CaseResponse>, so the body is deserialized into CaseOwnerInfo
+ * (extra fields are ignored via @JsonIgnoreProperties).
+ *
  * Fallback is triggered on network errors, timeouts, or circuit breaker open state.
  */
 @FeignClient(name = "case-service", fallbackFactory = CaseServiceFallback.class)
@@ -25,23 +25,14 @@ public interface CaseServiceClient {
     @GetMapping("/api/cases/{caseId}")
     CaseOwnerInfo getCaseDetails(@PathVariable("caseId") Long caseId);
 
-    @GetMapping("/api/cases/internal/{caseId}/status")
-    String getCaseStatus(@PathVariable("caseId") Long caseId);
-
     /**
      * Updates case status via internal endpoint.
-     * The newStatus parameter is passed as a query parameter.
-     * Example: ACTIVE, CLOSED, FILED, ADJOURNED
-     * 
-     * Note: 
-     * - The status value is converted by Spring to the Case.CaseStatus enum on case-service side.
-     * - Feign returns the CaseResponse body (unmarshaled from ResponseEntity<CaseResponse>) as Map
-     * - If case-service is down, the fallback is invoked instead
+     * Returned Map carries the updated case body, or a {"status":"FALLBACK", ...}
+     * marker if case-service is unavailable.
      */
     @PatchMapping("/api/cases/internal/{caseId}/status")
     Map<String, Object> updateCaseStatusInternal(
-        @PathVariable("caseId") Long caseId, 
+        @PathVariable("caseId") Long caseId,
         @RequestParam("newStatus") String newStatus
     );
 }
-

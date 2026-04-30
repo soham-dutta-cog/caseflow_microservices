@@ -21,6 +21,7 @@ public class WorkflowService {
     private final SLARecordRepository slaRecordRepository;
     private final CaseServiceClient caseClient;
     private final NotificationServiceClient notificationClient;
+    private final CachedWorkflowService cachedWorkflowService;
 
     // ===================== LIFECYCLE INIT =====================
 
@@ -266,9 +267,9 @@ public class WorkflowService {
         WorkflowStage current = workflowStageRepository.findByCaseIdAndActiveTrue(caseId)
                 .orElseThrow(() -> new ResourceNotFoundException("No active stage found for case: " + caseId));
 
-        SLARecord sla = slaRecordRepository.findByStageId(current.getStageId())
+        SLARecord sla = slaRecordRepository.findByStageIdAndEndDateIsNull(current.getStageId())
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "No SLA record found for active stage of case: " + caseId));
+                        "No open SLA record found for active stage of case: " + caseId));
 
         if (sla.getEndDate() != null) {
             throw new InvalidOperationException("Cannot extend SLA for a completed/closed stage");
@@ -283,7 +284,9 @@ public class WorkflowService {
         sla.setSlaDays(oldDays + request.getAdditionalDays());
         sla.setExtensionReason(request.getReason());
 
-        // SLA extension only updates the sla_records table, NOT workflow_stages
+        // Also sync workflow_stages.sla_days so stage queries reflect the updated SLA
+        current.setSlaDays(sla.getSlaDays());
+        workflowStageRepository.save(current);
 
         // if it was BREACHED or WARNING, re-evaluate status with new deadline
         long elapsed = ChronoUnit.DAYS.between(sla.getStartDate(), LocalDate.now());
@@ -299,6 +302,7 @@ public class WorkflowService {
         }
 
         slaRecordRepository.save(sla);
+        cachedWorkflowService.evictSLACacheForStage(sla.getStageId());
 
         sendNotification(requestedBy, caseId, "SLA Extended for Case #" + caseId + " Stage "
                 + current.getSequenceNumber() + " (" + current.getStageName() + "): "
@@ -387,7 +391,7 @@ public class WorkflowService {
     }
 
     private void closeSLAForStage(Long stageId, SLARecord.SLAStatus overrideStatus) {
-        SLARecord sla = slaRecordRepository.findByStageId(stageId).orElse(null);
+        SLARecord sla = slaRecordRepository.findByStageIdAndEndDateIsNull(stageId).orElse(null);
         if (sla != null && sla.getEndDate() == null) {
             sla.setEndDate(LocalDate.now());
             if (overrideStatus != null) {

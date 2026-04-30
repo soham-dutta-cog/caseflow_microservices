@@ -70,18 +70,37 @@ export const workflow = {
 }
 
 export const appeals = {
-  file: (data) => api.post('/api/appeals', data),
-  get: (id) => api.get(`/api/appeals/${id}`),
-  byCase: (caseId) => api.get(`/api/appeals/case/${caseId}`),
-  byUser: (userId) => api.get(`/api/appeals/user/${userId}`),
-  byStatus: (status) => api.get(`/api/appeals/status/${status}`),
-  openReview: (id, judgeId) => api.post(`/api/appeals/${id}/review?judgeId=${judgeId}`),
-  getReview: (id) => api.get(`/api/appeals/${id}/review`),
-  decide: (id, judgeId, data) => api.post(`/api/appeals/${id}/decide?judgeId=${judgeId}`, data),
-  reviewsByCase: (caseId) => api.get(`/api/appeals/reviews/case/${caseId}`),
-  reviewsByJudge: (judgeId) => api.get(`/api/appeals/reviews/judge/${judgeId}`),
-  updateOutcome: (reviewId, data) => api.patch(`/api/appeals/reviews/${reviewId}/outcome`, data),
-  paginated: (page = 0, size = 10, sort = 'appealId,desc') => api.get('/api/appeals/paginated', { page, size, sort }),
+  // Filing & lifecycle (caller does NOT send filedByUserId — backend resolves it from JWT)
+  file:   (data) => api.post('/api/appeals', data),
+  cancel: (id)   => api.patch(`/api/appeals/${id}/cancel`),
+
+  // Reads
+  get:       (id)      => api.get(`/api/appeals/${id}`),
+  mine:      ()        => api.get('/api/appeals/my'),
+  byCase:    (caseId)  => api.get(`/api/appeals/case/${caseId}`),
+  byUser:    (userId)  => api.get(`/api/appeals/user/${userId}`),
+  byStatus:  (status)  => api.get(`/api/appeals/status/${status}`),
+  paginated: (page = 0, size = 10, sort = 'appealId,desc') =>
+    api.get('/api/appeals/paginated', { page, size, sort }),
+
+  // Audit trail (filer or admin/clerk/judge)
+  audit: (id) => api.get(`/api/appeals/${id}/audit`),
+
+  // Reviews
+  openReview:     (id, judgeId)      => api.post(`/api/appeals/${id}/review?judgeId=${encodeURIComponent(judgeId)}`),
+  getReview:      (id)               => api.get(`/api/appeals/${id}/review`),
+  decide:         (id, data)         => api.post(`/api/appeals/${id}/decide`, data),
+  updateOutcome:  (reviewId, data)   => api.patch(`/api/appeals/reviews/${reviewId}/outcome`, data),
+  reviewsByCase:  (caseId)           => api.get(`/api/appeals/reviews/case/${caseId}`),
+  reviewsByJudge: (judgeId)          => api.get(`/api/appeals/reviews/judge/${judgeId}`),
+  myReviews:      ()                 => api.get('/api/appeals/reviews/my'),
+
+  // Documents (multipart upload)
+  uploadDoc:   (appealId, formData) => api.postForm(`/api/appeals/${appealId}/documents`, formData),
+  listDocs:    (appealId)           => api.get(`/api/appeals/${appealId}/documents`),
+  getDoc:      (docId)              => api.get(`/api/appeals/documents/${docId}`),
+  downloadDoc: (docId)              => api.raw(`/api/appeals/documents/${docId}/download`),
+  deleteDoc:   (docId)              => api.del(`/api/appeals/documents/${docId}`),
 }
 
 export const compliance = {

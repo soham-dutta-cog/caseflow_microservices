@@ -9,11 +9,11 @@ spring:
       server:
         git:
           uri: https://github.com/soham-dutta-cog/caseflow_config_server.git
-          default-label: ananya-branch
+          default-label: soham-config
           clone-on-start: true
           skip-ssl-validation: true
-          username: ananyan75
-          password: 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
+          username: soham-dutta-cog
+          password: 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
 
 eureka:
   client:

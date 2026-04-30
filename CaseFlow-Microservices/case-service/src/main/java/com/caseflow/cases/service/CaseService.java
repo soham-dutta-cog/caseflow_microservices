@@ -147,6 +147,16 @@ public class CaseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Case not found: " + caseId));
         Case.CaseStatus oldStatus = existingCase.getStatus();
         existingCase.setStatus(newStatus);
+
+        // Stamp closedDate on the CLOSED transition; clear it if the case is reopened
+        // (e.g. an appeal moves the case back to ACTIVE / FILED) so deadlines are
+        // computed against the most recent close.
+        if (newStatus == Case.CaseStatus.CLOSED && oldStatus != Case.CaseStatus.CLOSED) {
+            existingCase.setClosedDate(LocalDateTime.now());
+        } else if (newStatus != Case.CaseStatus.CLOSED) {
+            existingCase.setClosedDate(null);
+        }
+
         Case saved = caseRepository.save(existingCase);
 
         log.info("Case {} status updated from {} to {} by user {}", caseId, oldStatus, newStatus, updatedBy);
@@ -202,7 +212,9 @@ public class CaseService {
         CaseResponse res = new CaseResponse();
         res.setCaseId(c.getCaseId()); res.setTitle(c.getTitle());
         res.setLitigantId(c.getLitigantId()); res.setLawyerId(c.getLawyerId());
-        res.setFiledDate(c.getFiledDate()); res.setStatus(c.getStatus());
+        res.setFiledDate(c.getFiledDate());
+        res.setClosedDate(c.getClosedDate());
+        res.setStatus(c.getStatus());
         return res;
     }
 
