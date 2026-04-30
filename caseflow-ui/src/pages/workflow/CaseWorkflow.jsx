@@ -362,10 +362,11 @@ export default function CaseWorkflow() {
             <div className="card-body p-0">
               <div className="table-responsive">
                 <table className="table table-hover align-middle mb-0">
-                  <thead className="table-light"><tr><th>Seq</th><th>Stage</th><th>Role</th><th>SLA</th><th>Started</th><th>Completed</th><th>Status</th></tr></thead>
+                  <thead className="table-light"><tr><th>ID</th><th>Seq</th><th>Stage</th><th>Role</th><th>SLA</th><th>Started</th><th>Completed</th><th>Status</th></tr></thead>
                   <tbody>
                     {stages.map(s => (
                       <tr key={s.stageId}>
+                        <td className="text-muted small">#{s.stageId}</td>
                         <td><span className="badge bg-body-secondary text-dark rounded-circle d-inline-flex align-items-center justify-content-center" style={{ width: 28, height: 28 }}>{s.sequenceNumber}</span></td>
                         <td className="fw-semibold">{s.stageName}</td>
                         <td><span className="badge bg-body-secondary text-secondary">{s.roleResponsible}</span></td>

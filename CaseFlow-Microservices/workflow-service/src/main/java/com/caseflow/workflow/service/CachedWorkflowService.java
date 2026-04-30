@@ -5,6 +5,7 @@ import com.caseflow.workflow.entity.SLARecord;
 import com.caseflow.workflow.repository.WorkflowStageRepository;
 import com.caseflow.workflow.repository.SLARecordRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,5 +29,10 @@ public class CachedWorkflowService {
     @Cacheable(value = "slaRecords", key = "#stageId")
     public SLARecord getCachedSLAByStageId(Long stageId) {
         return slaRecordRepository.findByStageId(stageId).orElse(null);
+    }
+
+    @CacheEvict(value = "slaRecords", key = "#stageId")
+    public void evictSLACacheForStage(Long stageId) {
+        // evicts the cached SLA entry so next read fetches fresh data from DB
     }
 }
