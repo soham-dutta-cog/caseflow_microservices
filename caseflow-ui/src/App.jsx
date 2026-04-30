@@ -32,6 +32,7 @@ import JudgeSlots from './pages/hearings/JudgeSlots'
 
 import WorkflowDashboard from './pages/workflow/WorkflowDashboard'
 import CaseWorkflow from './pages/workflow/CaseWorkflow'
+import SlaMonitoring from './pages/workflow/SlaMonitoring'
 
 import AppealList from './pages/appeals/AppealList'
 import FileAppeal from './pages/appeals/FileAppeal'
@@ -94,8 +95,9 @@ function App() {
             <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK']}><JudgeSlots /></ProtectedRoute>} />
             <Route path="/hearings/:hearingId" element={<HearingDetail />} />
 
-            <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
-            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
+            <Route path="/workflow" element={<WorkflowDashboard />} />
+            <Route path="/workflow/sla" element={<ProtectedRoute roles={['ADMIN','CLERK']}><SlaMonitoring /></ProtectedRoute>} />
+            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><CaseWorkflow /></ProtectedRoute>} />
 
             <Route path="/appeals" element={<AppealList />} />
             <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER','ADMIN']}><FileAppeal /></ProtectedRoute>} />
