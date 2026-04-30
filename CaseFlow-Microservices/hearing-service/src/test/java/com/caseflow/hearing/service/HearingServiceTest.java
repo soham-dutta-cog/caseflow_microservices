@@ -29,9 +29,9 @@ class HearingServiceTest {
     }
 
     @Test void getHearingById_found() {
-        Hearing h = Hearing.builder().hearingId(1L).caseId(1L).judgeId(1L)
+        Hearing h = Hearing.builder().hearingId(1L).caseId(1L).judgeId("user-1")
             .hearingDate(LocalDate.now()).hearingTime("10:00 AM")
-            .status(Hearing.HearingStatus.SCHEDULED).scheduledBy(1L).build();
+            .status(Hearing.HearingStatus.SCHEDULED).scheduledBy("user-1").build();
         when(hearingRepository.findById(1L)).thenReturn(Optional.of(h));
         assertEquals(1L, hearingService.getHearingById(1L).getHearingId());
     }

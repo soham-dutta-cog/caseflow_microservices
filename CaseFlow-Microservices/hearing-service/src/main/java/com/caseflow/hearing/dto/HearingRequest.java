@@ -9,6 +9,6 @@ public class HearingRequest {
     @NotNull private String judgeId;
     @NotNull @FutureOrPresent private LocalDate hearingDate;
     @NotBlank private String hearingTime;
-    @NotNull private Long scheduledBy;
+    @NotBlank private String scheduledBy;
     @NotNull private Long scheduleId;
 }
