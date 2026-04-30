@@ -42,10 +42,6 @@ export const cases = {
 }
 
 export const hearings = {
-  addSlot: (data) => api.post('/api/hearings/schedule/slots', data),
-  availableSlots: (judgeId) => api.get(`/api/hearings/schedule/judge/${judgeId}/available`),
-  slotsByDate: (judgeId, date) => api.get(`/api/hearings/schedule/judge/${judgeId}/date/${date}`),
-  allSlots: (judgeId) => api.get(`/api/hearings/schedule/judge/${judgeId}/all`),
   schedule: (data) => api.post('/api/hearings/schedule', data),
   reschedule: (id, data) => api.patch(`/api/hearings/${id}/reschedule`, data),
   complete: (id, data) => api.patch(`/api/hearings/${id}/complete`, data),
