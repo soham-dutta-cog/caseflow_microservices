@@ -36,7 +36,6 @@ const NAV_GROUPS = [
     items: [
       { to: '/hearings', label: 'Hearings', icon: 'bi-calendar-event', roles: ['ADMIN', 'CLERK', 'JUDGE', 'LAWYER', 'LITIGANT'] },
       { to: '/hearings/schedule', label: 'Schedule', icon: 'bi-calendar-plus', roles: ['CLERK', 'JUDGE', 'ADMIN'] },
-      { to: '/hearings/slots', label: 'Judge Slots', icon: 'bi-clock-history', roles: ['JUDGE', 'CLERK', 'ADMIN'] },
     ],
   },
   {

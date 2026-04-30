@@ -4,6 +4,14 @@ import { hearings, cases, users } from '../../api/services'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 
+const FIXED_SLOTS = [
+  '9:00 AM - 10:00 AM',
+  '10:00 AM - 11:00 AM',
+  '11:00 AM - 12:00 PM',
+  '2:00 PM - 3:00 PM',
+  '3:00 PM - 4:00 PM',
+]
+
 const cardStyle = { borderRadius: 14, boxShadow: '0 2px 12px rgba(10,14,26,0.06)' }
 
 export default function ScheduleHearing() {
@@ -11,15 +19,13 @@ export default function ScheduleHearing() {
   const { t } = useLanguage()
   const nav = useNavigate()
 
-  const [form, setForm] = useState({
-    caseId: '', judgeId: '', hearingDate: '', hearingTime: '', scheduleId: '',
-  })
+  const [form, setForm] = useState({ caseId: '', judgeId: '', hearingDate: '', hearingTime: '' })
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
 
   const [caseList, setCaseList] = useState([])
   const [judgeList, setJudgeList] = useState([])
-  const [slots, setSlots] = useState([])
+  const [bookedTimes, setBookedTimes] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [caseSearch, setCaseSearch] = useState('')
   const [showCaseDropdown, setShowCaseDropdown] = useState(false)
@@ -29,15 +35,22 @@ export default function ScheduleHearing() {
     users.byRole('JUDGE').then(d => setJudgeList(d || [])).catch(() => {})
   }, [])
 
+  // When judge OR date changes, reload booked times for that judge+date
   useEffect(() => {
-    if (!form.judgeId) { setSlots([]); return }
+    setForm(f => ({ ...f, hearingTime: '' }))
+    setBookedTimes([])
+    if (!form.judgeId || !form.hearingDate) return
     setSlotsLoading(true)
-    setForm(f => ({ ...f, scheduleId: '' }))
-    hearings.availableSlots(form.judgeId)
-      .then(d => setSlots(d || []))
-      .catch(() => setSlots([]))
+    hearings.byJudge(form.judgeId)
+      .then(d => {
+        const booked = (d || [])
+          .filter(h => h.hearingDate === form.hearingDate && h.status !== 'CANCELLED')
+          .map(h => h.hearingTime)
+        setBookedTimes(booked)
+      })
+      .catch(() => {})
       .finally(() => setSlotsLoading(false))
-  }, [form.judgeId])
+  }, [form.judgeId, form.hearingDate])
 
   const filteredCases = caseList.filter(c => {
     const q = caseSearch.toLowerCase()
@@ -46,7 +59,7 @@ export default function ScheduleHearing() {
 
   const selectedCase = caseList.find(c => String(c.caseId) === String(form.caseId))
   const selectedJudge = judgeList.find(j => j.userId === form.judgeId)
-  const selectedSlot = slots.find(s => String(s.scheduleId) === String(form.scheduleId))
+  const availableSlots = FIXED_SLOTS.filter(s => !bookedTimes.includes(s))
 
   const submit = async (e) => {
     e.preventDefault()
@@ -58,20 +71,20 @@ export default function ScheduleHearing() {
         judgeId: form.judgeId,
         hearingDate: form.hearingDate,
         hearingTime: form.hearingTime,
-        scheduleId: Number(form.scheduleId),
         scheduledBy: user.userId,
       })
       nav(`/hearings/${res.hearingId}`)
     } catch (e) { setErr(e.message) } finally { setLoading(false) }
   }
 
+  const today = new Date().toISOString().split('T')[0]
+
   return (
     <div>
-      {/* Header */}
       <div className="mb-3">
         <h1 className="page-title h3 mb-1">{t('Schedule Hearing')}</h1>
         <p className="text-muted mb-0" style={{ fontSize: 13 }}>
-          Select a case, assign a judge, then pick an available time slot.
+          Select a case, assign a judge, pick a date, then choose a time slot.
         </p>
       </div>
 
@@ -79,7 +92,7 @@ export default function ScheduleHearing() {
 
       <div className="card border-0 mx-auto" style={{ ...cardStyle, maxWidth: 720 }}>
         <div className="card-body p-4">
-          {/* Section header */}
+
           <div className="d-flex align-items-center gap-2 mb-4">
             <div className="d-flex align-items-center justify-content-center flex-shrink-0"
               style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg, #c9a84c, #d4b865)' }}>
@@ -114,19 +127,15 @@ export default function ScheduleHearing() {
                   </div>
 
                   {showCaseDropdown && (
-                    <div className="position-absolute w-100 bg-white border-0 shadow"
-                      style={{ zIndex: 1050, maxHeight: 280, overflowY: 'auto', top: 'calc(100% + 4px)', borderRadius: 12 }}>
+                    <div className="position-absolute w-100 bg-white shadow"
+                      style={{ zIndex: 1050, maxHeight: 280, overflowY: 'auto', top: 'calc(100% + 4px)', borderRadius: 12, border: '1px solid #f0f2f7' }}>
                       <div className="p-2" style={{ borderBottom: '1px solid #f0f2f7' }}>
                         <div className="input-group input-group-sm">
                           <span className="input-group-text border-0 bg-light"><i className="bi bi-search text-muted" /></span>
-                          <input
-                            autoFocus
-                            className="form-control border-0 bg-light"
+                          <input autoFocus className="form-control border-0 bg-light"
                             placeholder={t('Search by ID, title, or type...')}
-                            value={caseSearch}
-                            onChange={e => setCaseSearch(e.target.value)}
-                            onClick={e => e.stopPropagation()}
-                          />
+                            value={caseSearch} onChange={e => setCaseSearch(e.target.value)}
+                            onClick={e => e.stopPropagation()} />
                         </div>
                       </div>
                       {filteredCases.length === 0 ? (
@@ -134,22 +143,15 @@ export default function ScheduleHearing() {
                           <i className="bi bi-search d-block mb-1" />No cases found
                         </div>
                       ) : filteredCases.map(c => (
-                        <div
-                          key={c.caseId}
+                        <div key={c.caseId}
                           className="px-3 py-2 d-flex justify-content-between align-items-center"
-                          style={{
-                            cursor: 'pointer',
-                            background: String(form.caseId) === String(c.caseId) ? '#0f1629' : 'transparent',
-                            color: String(form.caseId) === String(c.caseId) ? '#fff' : 'inherit',
-                            fontSize: 14,
-                            transition: 'background 0.15s',
-                          }}
+                          style={{ cursor: 'pointer', background: String(form.caseId) === String(c.caseId) ? '#0f1629' : 'transparent', color: String(form.caseId) === String(c.caseId) ? '#fff' : 'inherit', fontSize: 14, transition: 'background 0.15s' }}
                           onMouseEnter={e => { if (String(form.caseId) !== String(c.caseId)) e.currentTarget.style.background = '#f8f9fc' }}
                           onMouseLeave={e => { if (String(form.caseId) !== String(c.caseId)) e.currentTarget.style.background = 'transparent' }}
                           onClick={() => { setForm(f => ({ ...f, caseId: String(c.caseId) })); setShowCaseDropdown(false) }}
                         >
                           <div>
-                            <span className="fw-semibold" style={{ color: String(form.caseId) === String(c.caseId) ? '#c9a84c' : '#c9a84c' }}>#{c.caseId}</span>
+                            <span className="fw-semibold" style={{ color: '#c9a84c' }}>#{c.caseId}</span>
                             {c.title && <span className="ms-2">{c.title}</span>}
                           </div>
                           <div className="d-flex gap-1">
@@ -164,107 +166,115 @@ export default function ScheduleHearing() {
                 <input type="hidden" value={form.caseId} required />
               </div>
 
-              {/* ── Judge selector ── */}
+              {/* ── Judge + Date ── */}
               <div className="col-md-6">
                 <label className="form-label fw-semibold small">{t('Judge')}</label>
-                <select
-                  className="form-select"
-                  style={{ borderRadius: 9 }}
+                <select className="form-select" style={{ borderRadius: 9 }}
                   value={form.judgeId}
-                  onChange={e => setForm(f => ({ ...f, judgeId: e.target.value, scheduleId: '' }))}
-                  required
-                >
+                  onChange={e => setForm(f => ({ ...f, judgeId: e.target.value, hearingTime: '' }))}
+                  required>
                   <option value="">{t('Select a judge...')}</option>
                   {judgeList.map(j => (
-                    <option key={j.userId} value={j.userId}>
-                      {j.name || j.email} — {j.userId}
-                    </option>
+                    <option key={j.userId} value={j.userId}>{j.name || j.email} — {j.userId}</option>
                   ))}
                 </select>
               </div>
 
-              {/* ── Slot selector ── */}
               <div className="col-md-6">
-                <label className="form-label fw-semibold small">
-                  {t('Available Slot')}
-                  {form.judgeId && !slotsLoading && (
-                    <span className="text-muted fw-normal ms-1" style={{ fontSize: 11 }}>
-                      ({slots.length} available)
+                <label className="form-label fw-semibold small">{t('Hearing Date')}</label>
+                <input className="form-control" style={{ borderRadius: 9 }} type="date"
+                  min={today}
+                  value={form.hearingDate}
+                  onChange={e => setForm(f => ({ ...f, hearingDate: e.target.value, hearingTime: '' }))}
+                  required />
+              </div>
+
+              {/* ── Slot cards ── */}
+              <div className="col-12">
+                <label className="form-label fw-semibold small d-flex align-items-center justify-content-between">
+                  <span>{t('Available Time Slots')}</span>
+                  {form.judgeId && form.hearingDate && !slotsLoading && (
+                    <span className="text-muted fw-normal" style={{ fontSize: 11 }}>
+                      {availableSlots.length} of {FIXED_SLOTS.length} slots free — click to select
                     </span>
                   )}
                 </label>
-                {slotsLoading ? (
-                  <div className="form-control d-flex align-items-center gap-2 text-muted" style={{ borderRadius: 9 }}>
-                    <span className="spinner-border spinner-border-sm" />{t('Loading slots...')}
+
+                {!form.judgeId || !form.hearingDate ? (
+                  <div className="rounded-3 p-3 d-flex align-items-center gap-2"
+                    style={{ background: '#f8f9fc', border: '1px dashed #dee2e6' }}>
+                    <i className="bi bi-arrow-up-circle text-muted" />
+                    <span className="text-muted" style={{ fontSize: 13 }}>
+                      {!form.judgeId ? 'Select a judge' : 'Pick a date'} to see available slots
+                    </span>
+                  </div>
+                ) : slotsLoading ? (
+                  <div className="rounded-3 p-3 d-flex align-items-center gap-2"
+                    style={{ background: '#f8f9fc', border: '1px solid #f0f2f7' }}>
+                    <span className="spinner-border spinner-border-sm text-muted" />
+                    <span className="text-muted" style={{ fontSize: 13 }}>Checking availability...</span>
                   </div>
                 ) : (
-                  <select
-                    className="form-select"
-                    style={{ borderRadius: 9 }}
-                    value={form.scheduleId}
-                    onChange={e => {
-                      const slot = slots.find(s => String(s.scheduleId) === e.target.value)
-                      setForm(f => ({
-                        ...f,
-                        scheduleId: e.target.value,
-                        hearingDate: slot?.scheduleDate || f.hearingDate,
-                        hearingTime: slot?.timeSlot || f.hearingTime,
-                      }))
-                    }}
-                    required
-                    disabled={!form.judgeId || slots.length === 0}
-                  >
-                    <option value="">
-                      {!form.judgeId ? t('Select a judge first') : slots.length === 0 ? t('No available slots') : t('Select a slot...')}
-                    </option>
-                    {slots.map(s => (
-                      <option key={s.scheduleId} value={s.scheduleId}>
-                        #{s.scheduleId} — {s.scheduleDate} · {s.timeSlot}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              {/* ── Selected slot preview ── */}
-              {selectedSlot && (
-                <div className="col-12">
-                  <div className="d-flex align-items-center gap-3 p-3 rounded-3" style={{ background: '#f0f7ff', border: '1px solid #c7ddf5' }}>
-                    <i className="bi bi-calendar-check text-primary" style={{ fontSize: 20 }} />
-                    <div>
-                      <div className="fw-semibold" style={{ fontSize: 14, color: '#0f1629' }}>
-                        Slot #{selectedSlot.scheduleId} — {selectedSlot.scheduleDate} at {selectedSlot.timeSlot}
-                      </div>
-                      <div className="text-muted" style={{ fontSize: 12 }}>
-                        Date and time fields below are pre-filled from this slot
-                      </div>
-                    </div>
+                  <div className="d-flex flex-column gap-2">
+                    {FIXED_SLOTS.map(slot => {
+                      const booked = bookedTimes.includes(slot)
+                      const selected = form.hearingTime === slot
+                      return (
+                        <div key={slot}
+                          onClick={() => !booked && setForm(f => ({ ...f, hearingTime: slot }))}
+                          style={{
+                            cursor: booked ? 'not-allowed' : 'pointer',
+                            borderRadius: 10,
+                            padding: '12px 16px',
+                            border: selected ? '2px solid #0f1629' : booked ? '1.5px solid #f0f2f7' : '1.5px solid #e9ecef',
+                            background: selected ? '#0f1629' : booked ? '#fafafa' : '#fff',
+                            opacity: booked ? 0.55 : 1,
+                            transition: 'all 0.18s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                          onMouseEnter={e => { if (!booked && !selected) { e.currentTarget.style.borderColor = '#c9a84c'; e.currentTarget.style.background = '#fffbf0' } }}
+                          onMouseLeave={e => { if (!booked && !selected) { e.currentTarget.style.borderColor = '#e9ecef'; e.currentTarget.style.background = '#fff' } }}
+                        >
+                          <div className="d-flex align-items-center gap-3">
+                            <div className="d-flex align-items-center justify-content-center"
+                              style={{ width: 38, height: 38, borderRadius: 8, background: selected ? 'rgba(255,255,255,0.12)' : booked ? '#f0f2f7' : '#f8f9fc', flexShrink: 0 }}>
+                              <i className="bi bi-clock" style={{ fontSize: 16, color: selected ? '#c9a84c' : booked ? '#adb5bd' : '#6c757d' }} />
+                            </div>
+                            <div>
+                              <div className="fw-semibold" style={{ fontSize: 14, color: selected ? '#fff' : booked ? '#adb5bd' : '#0f1629' }}>
+                                {slot}
+                              </div>
+                              <div style={{ fontSize: 12, color: selected ? 'rgba(255,255,255,0.6)' : '#adb5bd' }}>
+                                {booked ? 'Already booked' : `${form.hearingDate}`}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="d-flex align-items-center gap-2">
+                            {booked ? (
+                              <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: '#f0f2f7', color: '#adb5bd', border: '1px solid #dee2e6' }}>
+                                Booked
+                              </span>
+                            ) : selected ? (
+                              <>
+                                <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}>
+                                  Selected
+                                </span>
+                                <i className="bi bi-check-circle-fill" style={{ fontSize: 16, color: '#c9a84c' }} />
+                              </>
+                            ) : (
+                              <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: '#e8f5ec', color: '#34a85a', border: '1px solid #b8e6c4' }}>
+                                Available
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                </div>
-              )}
-
-              {/* ── Date & Time ── */}
-              <div className="col-md-6">
-                <label className="form-label fw-semibold small">{t('Hearing Date')}</label>
-                <input
-                  className="form-control"
-                  style={{ borderRadius: 9 }}
-                  type="date"
-                  value={form.hearingDate}
-                  onChange={e => setForm(f => ({ ...f, hearingDate: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label fw-semibold small">{t('Hearing Time')}</label>
-                <input
-                  className="form-control"
-                  style={{ borderRadius: 9 }}
-                  value={form.hearingTime}
-                  onChange={e => setForm(f => ({ ...f, hearingTime: e.target.value }))}
-                  placeholder="e.g. 10:00 AM"
-                  required
-                />
+                )}
+                <input type="hidden" value={form.hearingTime} required />
               </div>
 
               {/* ── Scheduled By ── */}
@@ -281,20 +291,16 @@ export default function ScheduleHearing() {
 
             {/* Submit */}
             <div className="d-flex align-items-center gap-3 mt-4 pt-3" style={{ borderTop: '1px solid #f0f2f7' }}>
-              <button
-                className="btn btn-dark px-4"
+              <button className="btn btn-dark px-4"
                 style={{ borderRadius: 10, padding: '10px 28px', fontSize: 14 }}
-                disabled={loading || !form.caseId || !form.judgeId || !form.scheduleId}
-              >
+                disabled={loading || !form.caseId || !form.judgeId || !form.hearingDate || !form.hearingTime}>
                 {loading
                   ? <><span className="spinner-border spinner-border-sm me-2" />Scheduling...</>
-                  : <><i className="bi bi-calendar-check me-2" />{t('Schedule Hearing')}</>
-                }
+                  : <><i className="bi bi-calendar-check me-2" />{t('Schedule Hearing')}</>}
               </button>
-              {(!form.caseId || !form.judgeId || !form.scheduleId) && (
+              {(!form.caseId || !form.judgeId || !form.hearingDate || !form.hearingTime) && (
                 <span className="text-muted" style={{ fontSize: 12 }}>
-                  <i className="bi bi-info-circle me-1" />
-                  Complete all required fields to proceed
+                  <i className="bi bi-info-circle me-1" />Complete all required fields to proceed
                 </span>
               )}
             </div>

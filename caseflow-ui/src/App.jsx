@@ -28,7 +28,6 @@ import PendingDocuments from './pages/cases/PendingDocuments'
 import HearingList from './pages/hearings/HearingList'
 import HearingDetail from './pages/hearings/HearingDetail'
 import ScheduleHearing from './pages/hearings/ScheduleHearing'
-import JudgeSlots from './pages/hearings/JudgeSlots'
 
 import WorkflowDashboard from './pages/workflow/WorkflowDashboard'
 import CaseWorkflow from './pages/workflow/CaseWorkflow'
@@ -92,7 +91,6 @@ function App() {
 
             <Route path="/hearings" element={<HearingList />} />
             <Route path="/hearings/schedule" element={<ProtectedRoute roles={['CLERK','JUDGE']}><ScheduleHearing /></ProtectedRoute>} />
-            <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK']}><JudgeSlots /></ProtectedRoute>} />
             <Route path="/hearings/:hearingId" element={<HearingDetail />} />
 
             <Route path="/workflow" element={<WorkflowDashboard />} />

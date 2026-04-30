@@ -6,9 +6,8 @@ import java.time.LocalDate;
 @Data
 public class HearingRequest {
     @NotNull private Long caseId;
-    @NotNull private String judgeId;
+    @NotBlank private String judgeId;
     @NotNull @FutureOrPresent private LocalDate hearingDate;
     @NotBlank private String hearingTime;
     @NotBlank private String scheduledBy;
-    @NotNull private Long scheduleId;
 }

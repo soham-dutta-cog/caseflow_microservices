@@ -4,6 +4,14 @@ import { hearings } from '../../api/services'
 import { statusBadgeClass, formatDate } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
 
+const FIXED_SLOTS = [
+  '9:00 AM - 10:00 AM',
+  '10:00 AM - 11:00 AM',
+  '11:00 AM - 12:00 PM',
+  '2:00 PM - 3:00 PM',
+  '3:00 PM - 4:00 PM',
+]
+
 const statusIcon = {
   SCHEDULED: 'bi-calendar-check',
   RESCHEDULED: 'bi-calendar-event',
@@ -19,7 +27,7 @@ export default function HearingDetail() {
   const [h, setH] = useState(null)
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
-  const [resched, setResched] = useState({ newDate: '', newTime: '', newScheduleId: '', rescheduleReason: '' })
+  const [resched, setResched] = useState({ newDate: '', newTime: '', rescheduleReason: '' })
   const [complete, setComplete] = useState({ hearingNotes: '' })
   const [submitting, setSubmitting] = useState(false)
 
@@ -35,12 +43,11 @@ export default function HearingDetail() {
       await hearings.reschedule(hearingId, {
         newDate: resched.newDate,
         newTime: resched.newTime,
-        newScheduleId: Number(resched.newScheduleId),
         rescheduleReason: resched.rescheduleReason,
         clerkId: user.userId,
       })
       setMsg('Hearing rescheduled successfully.')
-      setResched({ newDate: '', newTime: '', newScheduleId: '', rescheduleReason: '' })
+      setResched({ newDate: '', newTime: '', rescheduleReason: '' })
       load()
     } catch (e) { setErr(e.message) } finally { setSubmitting(false) }
   }
@@ -199,21 +206,19 @@ export default function HearingDetail() {
             </div>
             <form onSubmit={doReschedule}>
               <div className="row g-3">
-                <div className="col-md-4">
+                <div className="col-md-6">
                   <label className="form-label fw-semibold small">New Date</label>
                   <input className="form-control" style={{ borderRadius: 8 }} type="date"
+                    min={new Date().toISOString().split('T')[0]}
                     value={resched.newDate} onChange={e => setResched({ ...resched, newDate: e.target.value })} required />
                 </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold small">New Time</label>
-                  <input className="form-control" style={{ borderRadius: 8 }}
-                    value={resched.newTime} onChange={e => setResched({ ...resched, newTime: e.target.value })}
-                    placeholder="e.g. 10:00 AM" required />
-                </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold small">New Slot ID</label>
-                  <input className="form-control" style={{ borderRadius: 8 }} type="number"
-                    value={resched.newScheduleId} onChange={e => setResched({ ...resched, newScheduleId: e.target.value })} required />
+                <div className="col-md-6">
+                  <label className="form-label fw-semibold small">New Time Slot</label>
+                  <select className="form-select" style={{ borderRadius: 8 }}
+                    value={resched.newTime} onChange={e => setResched({ ...resched, newTime: e.target.value })} required>
+                    <option value="">Select a time slot...</option>
+                    {FIXED_SLOTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
                 </div>
                 <div className="col-12">
                   <label className="form-label fw-semibold small">Reason <span className="text-muted fw-normal">(5–500 characters)</span></label>
