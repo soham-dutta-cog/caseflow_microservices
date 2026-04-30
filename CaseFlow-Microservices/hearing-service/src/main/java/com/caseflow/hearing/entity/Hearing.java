@@ -11,7 +11,7 @@ public class Hearing {
     @Column(nullable = false) private LocalDate hearingDate;
     @Column(nullable = false) private String hearingTime;
     @Column(nullable = false) @Enumerated(EnumType.STRING) private HearingStatus status;
-    @Column(nullable = false) private Long scheduledBy;
+    @Column(nullable = false) private String scheduledBy;
     private String rescheduleReason;
     private String hearingNotes;
     public enum HearingStatus { SCHEDULED, RESCHEDULED, COMPLETED }

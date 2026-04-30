@@ -44,7 +44,7 @@ public class HearingService {
         scheduleRepository.save(slot);
 
         // Notify the judge assigned to the hearing
-        sendNotification(String.valueOf(saved.getJudgeId()), saved.getCaseId(),
+        sendNotification(saved.getJudgeId(), saved.getCaseId(),
             "Hearing #" + saved.getHearingId() + " scheduled for case #" + saved.getCaseId()
             + " on " + saved.getHearingDate() + " at " + saved.getHearingTime() + ".", "HEARING");
 
@@ -73,7 +73,7 @@ public class HearingService {
         try { caseClient.updateCaseStatusInternal(hearing.getCaseId(), "ADJOURNED"); } catch (Exception e) { log.warn("Failed to update case status: {}", e.getMessage()); }
 
         // Notify the judge of the rescheduled hearing
-        sendNotification(String.valueOf(saved.getJudgeId()), saved.getCaseId(),
+        sendNotification(saved.getJudgeId(), saved.getCaseId(),
             "Hearing #" + hearingId + " for case #" + saved.getCaseId()
             + " has been rescheduled to " + saved.getHearingDate() + " at " + saved.getHearingTime()
             + ". Reason: " + saved.getRescheduleReason(), "HEARING");
@@ -97,7 +97,7 @@ public class HearingService {
         try { workflowClient.advanceWorkflow(hearing.getCaseId()); } catch (Exception e) { log.warn("Failed to advance workflow: {}", e.getMessage()); }
 
         // Notify the judge that the hearing has been completed and their slot is now free
-        sendNotification(String.valueOf(saved.getJudgeId()), saved.getCaseId(),
+        sendNotification(saved.getJudgeId(), saved.getCaseId(),
             "Hearing #" + hearingId + " for case #" + saved.getCaseId()
             + " has been marked COMPLETED. Workflow advanced.", "HEARING");
 
