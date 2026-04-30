@@ -101,6 +101,9 @@ export default function Dashboard() {
                 <i className="bi bi-calendar-plus me-1" /> {t('Schedule Hearing')}
               </Link>
             )}
+            <Link to="/workflow" className="btn btn-sm btn-outline-dark fw-medium" style={{ borderRadius: 8, padding: '8px 16px', fontSize: 13 }}>
+              <i className="bi bi-diagram-3 me-1" /> {['CLERK', 'ADMIN'].includes(user?.role) ? t('Workflow Management') : t('Track Workflow')}
+            </Link>
             <Link to="/notifications" className="btn btn-sm btn-outline-dark fw-medium" style={{ borderRadius: 8, padding: '8px 16px', fontSize: 13 }}>
               <i className="bi bi-bell me-1" /> {t('Notifications')}
             </Link>

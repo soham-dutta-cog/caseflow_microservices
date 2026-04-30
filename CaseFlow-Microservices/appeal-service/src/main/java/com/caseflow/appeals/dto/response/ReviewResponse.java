@@ -4,7 +4,7 @@ import com.caseflow.appeals.entity.Review.ReviewOutcome;
 import lombok.Builder;
 import lombok.Data;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Response DTO returned for all review read/write operations.
@@ -16,7 +16,7 @@ public class ReviewResponse {
     private Long          caseId;
     private Long          appealId;
     private String        judgeId;
-    private LocalDate     reviewDate;
+    private LocalDateTime reviewDate;
     private ReviewOutcome outcome;
     private String        remarks;
 }

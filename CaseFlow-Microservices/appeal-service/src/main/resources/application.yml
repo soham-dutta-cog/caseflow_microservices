@@ -28,9 +28,20 @@ spring:
       httpclient:
         hc5:
           enabled: true
+  servlet:
+    multipart:
+      # Aligned with the 10MB cap enforced in util/FileStorageUtil.
+      # Allow some headroom on the request envelope for multi-part overhead.
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 server:
   port: 8085
+
+appeal:
+  # Maximum number of days after a case is CLOSED that an appeal may be filed.
+  # 0 or negative disables the check.
+  filing-deadline-days: 90
 
 eureka:
   client:
@@ -68,6 +79,8 @@ resilience4j:
       workflow-service:
         base-config: default
       notification-service:
+        base-config: default
+      iam-service:
         base-config: default
   timelimiter:
     configs:

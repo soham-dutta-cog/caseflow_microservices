@@ -32,10 +32,13 @@ import JudgeSlots from './pages/hearings/JudgeSlots'
 
 import WorkflowDashboard from './pages/workflow/WorkflowDashboard'
 import CaseWorkflow from './pages/workflow/CaseWorkflow'
+import SlaMonitoring from './pages/workflow/SlaMonitoring'
 
 import AppealList from './pages/appeals/AppealList'
 import FileAppeal from './pages/appeals/FileAppeal'
 import AppealDetail from './pages/appeals/AppealDetail'
+import MyReviews from './pages/appeals/MyReviews'
+import ReviewsByJudge from './pages/appeals/ReviewsByJudge'
 
 import ComplianceList from './pages/compliance/ComplianceList'
 import RunComplianceCheck from './pages/compliance/RunComplianceCheck'
@@ -92,11 +95,14 @@ function App() {
             <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK']}><JudgeSlots /></ProtectedRoute>} />
             <Route path="/hearings/:hearingId" element={<HearingDetail />} />
 
-            <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
-            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
+            <Route path="/workflow" element={<WorkflowDashboard />} />
+            <Route path="/workflow/sla" element={<ProtectedRoute roles={['ADMIN','CLERK']}><SlaMonitoring /></ProtectedRoute>} />
+            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><CaseWorkflow /></ProtectedRoute>} />
 
             <Route path="/appeals" element={<AppealList />} />
-            <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT']}><FileAppeal /></ProtectedRoute>} />
+            <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER','ADMIN']}><FileAppeal /></ProtectedRoute>} />
+            <Route path="/appeals/reviews/my" element={<ProtectedRoute roles={['JUDGE','ADMIN']}><MyReviews /></ProtectedRoute>} />
+            <Route path="/appeals/reviews/judge" element={<ProtectedRoute roles={['JUDGE','CLERK','ADMIN']}><ReviewsByJudge /></ProtectedRoute>} />
             <Route path="/appeals/:appealId" element={<AppealDetail />} />
 
             <Route path="/compliance/check" element={<ProtectedRoute roles={['ADMIN','CLERK']}><RunComplianceCheck /></ProtectedRoute>} />

@@ -3,7 +3,7 @@ package com.caseflow.appeals.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "appeals")
@@ -25,7 +25,7 @@ public class Appeal {
     private String filedByUserId;
 
     @Column(nullable = false)
-    private LocalDate filedDate;
+    private LocalDateTime filedDate;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String reason;
@@ -33,6 +33,9 @@ public class Appeal {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private AppealStatus status;
+
+    @Version
+    private Long version;
 
     public enum AppealStatus {SUBMITTED, REVIEWED, DECIDED, CANCELLED}
 }
