@@ -5,7 +5,7 @@ import java.time.LocalDate;
 
 @Data
 public class ScheduleRequest {
-    @NotNull private Long judgeId;
+    @NotNull private String judgeId;
     @NotNull @FutureOrPresent private LocalDate scheduleDate;
     @NotBlank private String timeSlot;
 }

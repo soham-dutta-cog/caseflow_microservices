@@ -5,6 +5,6 @@ import java.util.List;
 
 public interface HearingRepository extends JpaRepository<Hearing, Long> {
     List<Hearing> findByCaseId(Long caseId);
-    List<Hearing> findByJudgeId(Long judgeId);
+    List<Hearing> findByJudgeId(String judgeId);
     List<Hearing> findByStatus(Hearing.HearingStatus status);
 }
