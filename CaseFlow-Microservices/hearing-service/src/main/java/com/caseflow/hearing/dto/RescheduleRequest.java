@@ -7,7 +7,6 @@ import java.time.LocalDate;
 public class RescheduleRequest {
     @NotNull @FutureOrPresent private LocalDate newDate;
     @NotBlank private String newTime;
-    @NotNull private Long newScheduleId;
     @NotBlank @Size(min = 5, max = 500) private String rescheduleReason;
-    @NotNull private Long clerkId;
+    @NotBlank private String clerkId;
 }

@@ -174,29 +174,54 @@ export default function RunComplianceCheck() {
       {results !== null && (
         <>
           {/* Summary strip */}
-          <div className="row g-3 mb-4">
-            <div className="col-6 col-md-3">
-              <div className="card border-0 shadow-sm text-center py-3">
-                <div className="h3 mb-0 fw-bold">{stats.cases}</div>
-                <div className="text-muted small">Case{stats.cases !== 1 ? 's' : ''} Checked</div>
-              </div>
-            </div>
-            <div className="col-6 col-md-3">
-              <div className="card border-0 shadow-sm text-center py-3">
-                <div className="h3 mb-0 fw-bold">{stats.total}</div>
-                <div className="text-muted small">Total Checks</div>
-              </div>
-            </div>
-            <div className="col-6 col-md-3">
-              <div className={`card border-0 shadow-sm text-center py-3 ${stats.pass === stats.total ? 'bg-success bg-opacity-10' : ''}`}>
-                <div className="h3 mb-0 fw-bold text-success">{stats.pass}</div>
-                <div className="text-muted small">Passed</div>
-              </div>
-            </div>
-            <div className="col-6 col-md-3">
-              <div className={`card border-0 shadow-sm text-center py-3 ${stats.fail > 0 ? 'bg-danger bg-opacity-10' : ''}`}>
-                <div className={`h3 mb-0 fw-bold ${stats.fail > 0 ? 'text-danger' : 'text-success'}`}>{stats.fail}</div>
-                <div className="text-muted small">Failed</div>
+          <div className="card shadow-sm border-0 mb-4">
+            <div className="card-body">
+              <div className="row g-3 align-items-center">
+                <div className="col-6 col-md-3 text-center">
+                  <div className="h3 fw-bold mb-0">{stats.cases}</div>
+                  <div className="text-muted small mt-1">
+                    <i className="bi bi-folder2 me-1" />Case{stats.cases !== 1 ? 's' : ''} Checked
+                  </div>
+                </div>
+                <div className="col-6 col-md-3 text-center">
+                  <div className="h3 fw-bold mb-0">{stats.total}</div>
+                  <div className="text-muted small mt-1">
+                    <i className="bi bi-clipboard-check me-1" />Total Checks
+                  </div>
+                </div>
+                <div className="col-6 col-md-3 text-center">
+                  <div className="h3 fw-bold mb-0 text-success">{stats.pass}</div>
+                  <div className="text-muted small mt-1">
+                    <i className="bi bi-check-circle me-1 text-success" />Passed
+                  </div>
+                </div>
+                <div className="col-6 col-md-3 text-center">
+                  <div className="h3 fw-bold mb-0 text-secondary">{stats.fail}</div>
+                  <div className="text-muted small mt-1">
+                    <i className="bi bi-exclamation-circle me-1" />Need Review
+                  </div>
+                </div>
+                {stats.total > 0 && (
+                  <div className="col-12">
+                    <div className="d-flex justify-content-between text-muted small mb-1">
+                      <span>Pass rate</span>
+                      <span>{stats.total > 0 ? Math.round((stats.pass / stats.total) * 100) : 0}%</span>
+                    </div>
+                    <div className="progress" style={{ height: 8, borderRadius: 8 }}>
+                      <div
+                        className="progress-bar bg-success"
+                        style={{ width: `${stats.total > 0 ? (stats.pass / stats.total) * 100 : 0}%` }}
+                      />
+                      <div
+                        className="progress-bar"
+                        style={{
+                          width: `${stats.total > 0 ? (stats.fail / stats.total) * 100 : 0}%`,
+                          background: '#dee2e6',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -211,10 +236,10 @@ export default function RunComplianceCheck() {
             </div>
           )}
           {stats.fail > 0 && (
-            <div className="alert alert-danger d-flex align-items-start gap-2 mb-4">
-              <i className="bi bi-exclamation-triangle-fill fs-5 mt-1" />
+            <div className="alert alert-warning d-flex align-items-start gap-2 mb-4">
+              <i className="bi bi-exclamation-circle-fill fs-5 mt-1" />
               <div>
-                <strong>{stats.fail} check{stats.fail !== 1 ? 's' : ''} failed</strong> across {failedCaseIds.length} case{failedCaseIds.length !== 1 ? 's' : ''}.
+                <strong>{stats.fail} check{stats.fail !== 1 ? 's' : ''} need review</strong> across {failedCaseIds.length} case{failedCaseIds.length !== 1 ? 's' : ''}.
                 {stats.docFail > 0 && <span className="ms-1">Document issues: <strong>{stats.docFail}</strong>.</span>}
                 {stats.procFail > 0 && <span className="ms-1">SLA/Process issues: <strong>{stats.procFail}</strong>.</span>}
                 <span className="ms-1 d-block d-sm-inline">The court administrator has been notified.</span>
@@ -249,7 +274,7 @@ export default function RunComplianceCheck() {
                     </thead>
                     <tbody>
                       {results.map((r, i) => (
-                        <tr key={r.complianceId ?? i} className={r.result === 'FAIL' ? 'table-danger' : ''}>
+                        <tr key={r.complianceId ?? i}>
                           <td>
                             <Link to={`/cases/${r.caseId}`} className="fw-semibold">
                               #{r.caseId}

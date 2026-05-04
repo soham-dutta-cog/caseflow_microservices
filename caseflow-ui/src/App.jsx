@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { LanguageProvider } from './context/LanguageContext'
+import { ThemeProvider } from './context/ThemeContext'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -26,14 +28,16 @@ import PendingDocuments from './pages/cases/PendingDocuments'
 import HearingList from './pages/hearings/HearingList'
 import HearingDetail from './pages/hearings/HearingDetail'
 import ScheduleHearing from './pages/hearings/ScheduleHearing'
-import JudgeSlots from './pages/hearings/JudgeSlots'
 
 import WorkflowDashboard from './pages/workflow/WorkflowDashboard'
 import CaseWorkflow from './pages/workflow/CaseWorkflow'
+import SlaMonitoring from './pages/workflow/SlaMonitoring'
 
 import AppealList from './pages/appeals/AppealList'
 import FileAppeal from './pages/appeals/FileAppeal'
 import AppealDetail from './pages/appeals/AppealDetail'
+import MyReviews from './pages/appeals/MyReviews'
+import ReviewsByJudge from './pages/appeals/ReviewsByJudge'
 
 import ComplianceList from './pages/compliance/ComplianceList'
 import RunComplianceCheck from './pages/compliance/RunComplianceCheck'
@@ -58,6 +62,8 @@ function PublicLayout({ children }) {
 
 function App() {
   return (
+    <ThemeProvider>
+    <LanguageProvider>
     <AuthProvider>
       <Router>
         <Routes>
@@ -79,20 +85,22 @@ function App() {
             <Route path="/change-password" element={<ChangePassword />} />
 
             <Route path="/cases" element={<CaseList />} />
-            <Route path="/cases/file" element={<FileCase />} />
+            <Route path="/cases/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER','CLERK']}><FileCase /></ProtectedRoute>} />
             <Route path="/cases/documents/pending" element={<ProtectedRoute roles={['CLERK','ADMIN']}><PendingDocuments /></ProtectedRoute>} />
             <Route path="/cases/:caseId" element={<CaseDetail />} />
 
             <Route path="/hearings" element={<HearingList />} />
-            <Route path="/hearings/schedule" element={<ProtectedRoute roles={['CLERK','JUDGE','ADMIN']}><ScheduleHearing /></ProtectedRoute>} />
-            <Route path="/hearings/slots" element={<ProtectedRoute roles={['JUDGE','CLERK','ADMIN']}><JudgeSlots /></ProtectedRoute>} />
+            <Route path="/hearings/schedule" element={<ProtectedRoute roles={['CLERK','JUDGE']}><ScheduleHearing /></ProtectedRoute>} />
             <Route path="/hearings/:hearingId" element={<HearingDetail />} />
 
-            <Route path="/workflow" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
-            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><WorkflowDashboard /></ProtectedRoute>} />
+            <Route path="/workflow" element={<WorkflowDashboard />} />
+            <Route path="/workflow/sla" element={<ProtectedRoute roles={['ADMIN','CLERK']}><SlaMonitoring /></ProtectedRoute>} />
+            <Route path="/workflow/:caseId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><CaseWorkflow /></ProtectedRoute>} />
 
             <Route path="/appeals" element={<AppealList />} />
-            <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER']}><FileAppeal /></ProtectedRoute>} />
+            <Route path="/appeals/file" element={<ProtectedRoute roles={['LITIGANT','LAWYER','ADMIN']}><FileAppeal /></ProtectedRoute>} />
+            <Route path="/appeals/reviews/my" element={<ProtectedRoute roles={['JUDGE','ADMIN']}><MyReviews /></ProtectedRoute>} />
+            <Route path="/appeals/reviews/judge" element={<ProtectedRoute roles={['JUDGE','CLERK','ADMIN']}><ReviewsByJudge /></ProtectedRoute>} />
             <Route path="/appeals/:appealId" element={<AppealDetail />} />
 
             <Route path="/compliance/check" element={<ProtectedRoute roles={['ADMIN','CLERK']}><RunComplianceCheck /></ProtectedRoute>} />
@@ -110,6 +118,8 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
+    </LanguageProvider>
+    </ThemeProvider>
   )
 }
 

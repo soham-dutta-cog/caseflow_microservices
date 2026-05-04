@@ -5,8 +5,8 @@ import java.time.LocalDate;
 
 @Data
 public class HearingResponse {
-    private Long hearingId; private Long caseId; private Long judgeId;
+    private Long hearingId; private Long caseId; private String judgeId;
     private LocalDate hearingDate; private String hearingTime;
-    private Hearing.HearingStatus status; private Long scheduledBy;
+    private Hearing.HearingStatus status; private String scheduledBy;
     private String rescheduleReason; private String hearingNotes;
 }

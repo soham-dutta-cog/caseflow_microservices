@@ -1,15 +1,17 @@
 package com.caseflow.appeals.service;
 
 import com.caseflow.appeals.client.CaseServiceClient;
-import com.caseflow.appeals.client.NotificationServiceClient;
+import com.caseflow.appeals.client.IamServiceClient;
 import com.caseflow.appeals.client.WorkflowServiceClient;
 import com.caseflow.appeals.dto.request.DecisionRequest;
-import com.caseflow.appeals.dto.request.UpdateOutcomeRequest;
+import com.caseflow.appeals.dto.response.CaseOwnerInfo;
 import com.caseflow.appeals.dto.response.ReviewResponse;
 import com.caseflow.appeals.entity.Appeal;
 import com.caseflow.appeals.entity.Appeal.AppealStatus;
+import com.caseflow.appeals.entity.AppealAudit.Action;
 import com.caseflow.appeals.entity.Review;
 import com.caseflow.appeals.entity.Review.ReviewOutcome;
+import com.caseflow.appeals.event.AppealEvent;
 import com.caseflow.appeals.exception.DuplicateResourceException;
 import com.caseflow.appeals.exception.InvalidOperationException;
 import com.caseflow.appeals.exception.ResourceNotFoundException;
@@ -17,10 +19,11 @@ import com.caseflow.appeals.repository.AppealRepository;
 import com.caseflow.appeals.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -34,23 +37,38 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
 public class ReviewService {
 
-    private final AppealRepository  appealRepository;
-    private final ReviewRepository  reviewRepository;
-    private final CaseServiceClient caseClient;
-    private final WorkflowServiceClient  workflowClient;
-    private final NotificationServiceClient notificationClient;
+    private static final String ROLE_ADMIN  = "ADMIN";
+    private static final String ROLE_JUDGE  = "JUDGE";
+
+    private static final String CASE_STATUS_ACTIVE = "ACTIVE";
+    private static final String CASE_STATUS_FILED  = "FILED";
+    private static final String FALLBACK_MARKER    = "FALLBACK";
+
+    private final AppealRepository          appealRepository;
+    private final ReviewRepository          reviewRepository;
+    private final CaseServiceClient         caseClient;
+    private final IamServiceClient          iamClient;
+    private final WorkflowServiceClient     workflowClient;
+    private final ApplicationEventPublisher events;
+    private final AppealAuditService        audit;
 
     // ─── Open For Review ─────────────────────────────────────────────────────
 
     /**
      * Assign a judge and transition the appeal SUBMITTED → REVIEWED.
-     * The same judge cannot be assigned to two appeals for the same case
-     * (conflict-of-interest guard).
+     * - The supplied judgeId must exist in iam-service and have the JUDGE role.
+     * - The same judge cannot be assigned to two ACTIVE / DECIDED appeals on
+     *   the same case (conflict-of-interest guard, ignores CANCELLED appeals).
      */
-    public ReviewResponse openForReview(Long appealId, String judgeId) {
+    @Transactional
+    public ReviewResponse openForReview(Long appealId, String judgeId,
+                                        String actorUserId, String actorRole) {
+        if (judgeId == null || judgeId.isBlank()) {
+            throw new InvalidOperationException("judgeId is required to open an appeal for review.");
+        }
+
         Appeal appeal = findAppealOrThrow(appealId);
 
         if (appeal.getStatus() != AppealStatus.SUBMITTED) {
@@ -59,10 +77,12 @@ public class ReviewService {
                 "Current state: " + appeal.getStatus());
         }
 
-        if (reviewRepository.existsByCaseIdAndJudgeId(appeal.getCaseId(), judgeId)) {
+        validateJudge(judgeId);
+
+        if (reviewRepository.existsActiveAssignmentForJudge(appeal.getCaseId(), judgeId)) {
             throw new DuplicateResourceException(
-                "Judge [" + judgeId + "] has already reviewed an appeal for case #" + appeal.getCaseId()
-                + ". Assign a different judge to avoid conflict of interest.");
+                "Judge [" + judgeId + "] is already (or has been) assigned to an active appeal for case #"
+                + appeal.getCaseId() + ". Assign a different judge to avoid conflict of interest.");
         }
 
         appeal.setStatus(AppealStatus.REVIEWED);
@@ -72,25 +92,51 @@ public class ReviewService {
             .caseId(appeal.getCaseId())
             .appealId(appealId)
             .judgeId(judgeId)
-            .reviewDate(LocalDate.now())
+            .reviewDate(LocalDateTime.now())
             .build();
         review = reviewRepository.save(review);
         log.info("Appeal #{} opened for review. Assigned to judge [{}]", appealId, judgeId);
 
-        // Notify the filer their appeal is now under review
-        try {
-            notificationClient.sendNotification(Map.of(
-                "userId",   appeal.getFiledByUserId(),
-                "caseId",   appeal.getCaseId(),
-                "category", "APPEAL",
-                "message",  "Appeal #" + appealId + " for case #" + appeal.getCaseId()
-                            + " is now under review by an assigned judge."
-            ));
-        } catch (Exception e) {
-            log.warn("Failed to send APPEAL_UNDER_REVIEW notification for appeal #{}: {}", appealId, e.getMessage());
-        }
+        audit.record(appealId, Action.OPENED_FOR_REVIEW,
+            actorUserId, actorRole,
+            AppealStatus.SUBMITTED, AppealStatus.REVIEWED,
+            "judgeId=" + judgeId);
+
+        CaseOwnerInfo caseInfo = caseClient.getCaseDetails(appeal.getCaseId());
+        events.publishEvent(new AppealEvent(
+            AppealEvent.Type.UNDER_REVIEW,
+            appealId,
+            appeal.getCaseId(),
+            AppealService.stakeholders(appeal.getFiledByUserId(), caseInfo, judgeId),
+            "Appeal #" + appealId + " for case #" + appeal.getCaseId()
+                + " is now under review by judge [" + judgeId + "]."
+        ));
 
         return toReviewResponse(review);
+    }
+
+    private void validateJudge(String judgeId) {
+        Boolean exists;
+        String  role;
+        try {
+            exists = iamClient.existsById(judgeId);
+            role   = iamClient.getUserRole(judgeId);
+        } catch (Exception e) {
+            log.error("Unable to reach iam-service to validate judge [{}]: {}", judgeId, e.getMessage());
+            throw new InvalidOperationException(
+                "Cannot validate judge — IAM service is temporarily unavailable. Please try again.");
+        }
+        if (exists == null || role == null) {
+            throw new InvalidOperationException(
+                "Cannot validate judge — IAM service is temporarily unavailable. Please try again.");
+        }
+        if (!Boolean.TRUE.equals(exists)) {
+            throw new ResourceNotFoundException("Judge not found in IAM: [" + judgeId + "]");
+        }
+        if (!ROLE_JUDGE.equalsIgnoreCase(role)) {
+            throw new InvalidOperationException(
+                "User [" + judgeId + "] cannot be assigned as a judge. Their role is " + role + ".");
+        }
     }
 
     // ─── Issue Decision ──────────────────────────────────────────────────────
@@ -101,6 +147,7 @@ public class ReviewService {
      * Case status is updated via case-service based on the outcome.
      * The DECIDED status is always persisted even if downstream calls fail.
      */
+    @Transactional
     public ReviewResponse issueDecision(Long appealId, String judgeId,
                                         DecisionRequest request, String userRole) {
         Appeal appeal = findAppealOrThrow(appealId);
@@ -113,8 +160,7 @@ public class ReviewService {
             .orElseThrow(() -> new ResourceNotFoundException(
                 "No review record found for appeal #" + appealId));
 
-        // Only the assigned judge or ADMIN can decide
-        if (!"ADMIN".equalsIgnoreCase(userRole) && !judgeId.equals(review.getJudgeId())) {
+        if (!ROLE_ADMIN.equalsIgnoreCase(userRole) && !judgeId.equals(review.getJudgeId())) {
             throw new InvalidOperationException(
                 "Access denied: Only the assigned judge [" + review.getJudgeId() + "] " +
                 "or an ADMIN can issue a decision on appeal #" + appealId + ".");
@@ -130,48 +176,52 @@ public class ReviewService {
         ReviewOutcome outcome = request.getOutcome();
         log.info("Decision issued for appeal #{} by judge [{}]: outcome={}", appealId, judgeId, outcome);
 
-        // Cross-service case-status update — try-catch ensures DECIDED always persists
+        audit.record(appealId, Action.DECIDED,
+            judgeId, userRole,
+            AppealStatus.REVIEWED, AppealStatus.DECIDED,
+            "outcome=" + outcome.name() + ";judgeId=" + review.getJudgeId());
+
+        // Cross-service case-status update — try-catch ensures DECIDED always persists.
+        // NOTE: a partial failure here leaves the case stuck CLOSED while the appeal
+        // is DECIDED. A future outbox/saga pattern should reconcile this.
         try {
-            if (outcome == ReviewOutcome.APPEAL_UPHELD || outcome == ReviewOutcome.RETRIAL_ORDERED) {
-                log.info("Updating case #{} status: CLOSED → ACTIVE", appeal.getCaseId());
-                Map<String, Object> resp = caseClient.updateCaseStatusInternal(appeal.getCaseId(), "ACTIVE");
-                if (resp != null && "FALLBACK".equals(resp.get("status"))) {
-                    log.error("FALLBACK: case-service unavailable — case #{} NOT updated to ACTIVE", appeal.getCaseId());
-                } else {
-                    log.info("Case #{} status updated to ACTIVE successfully", appeal.getCaseId());
+            switch (outcome) {
+                case APPEAL_UPHELD, RETRIAL_ORDERED -> {
+                    log.info("Updating case #{} status: CLOSED → ACTIVE", appeal.getCaseId());
+                    Map<String, Object> resp = caseClient.updateCaseStatusInternal(appeal.getCaseId(), CASE_STATUS_ACTIVE);
+                    if (resp != null && FALLBACK_MARKER.equals(resp.get("status"))) {
+                        log.error("FALLBACK: case-service unavailable — case #{} NOT updated to ACTIVE", appeal.getCaseId());
+                    } else {
+                        log.info("Case #{} status updated to ACTIVE successfully", appeal.getCaseId());
+                    }
+                    workflowClient.advanceWorkflow(appeal.getCaseId());
                 }
-                workflowClient.advanceWorkflow(appeal.getCaseId());
-
-            } else if (outcome == ReviewOutcome.REMANDED) {
-                log.info("Updating case #{} status: CLOSED → FILED", appeal.getCaseId());
-                Map<String, Object> resp = caseClient.updateCaseStatusInternal(appeal.getCaseId(), "FILED");
-                if (resp != null && "FALLBACK".equals(resp.get("status"))) {
-                    log.error("FALLBACK: case-service unavailable — case #{} NOT updated to FILED", appeal.getCaseId());
-                } else {
-                    log.info("Case #{} status updated to FILED successfully", appeal.getCaseId());
+                case REMANDED -> {
+                    log.info("Updating case #{} status: CLOSED → FILED", appeal.getCaseId());
+                    Map<String, Object> resp = caseClient.updateCaseStatusInternal(appeal.getCaseId(), CASE_STATUS_FILED);
+                    if (resp != null && FALLBACK_MARKER.equals(resp.get("status"))) {
+                        log.error("FALLBACK: case-service unavailable — case #{} NOT updated to FILED", appeal.getCaseId());
+                    } else {
+                        log.info("Case #{} status updated to FILED successfully", appeal.getCaseId());
+                    }
                 }
-
-            } else {
-                // APPEAL_DISMISSED / PARTIALLY_UPHELD → case stays CLOSED
-                log.info("Outcome {} — case #{} status unchanged (remains CLOSED)", outcome, appeal.getCaseId());
+                default ->
+                    log.info("Outcome {} — case #{} status unchanged (remains CLOSED)", outcome, appeal.getCaseId());
             }
         } catch (Exception e) {
             log.error("DOWNSTREAM FAILURE: could not update case #{} status after decision [{}] on appeal #{}. " +
                       "Appeal is DECIDED. Cause: {}", appeal.getCaseId(), outcome, appealId, e.getMessage());
         }
 
-        // Notify the appeal filer of the outcome
-        try {
-            notificationClient.sendNotification(Map.of(
-                "userId",   appeal.getFiledByUserId(),
-                "caseId",   appeal.getCaseId(),
-                "category", "APPEAL",
-                "message",  "Appeal #" + appealId + " for case #" + appeal.getCaseId()
-                            + " has been decided. Outcome: " + outcome.name()
-            ));
-        } catch (Exception e) {
-            log.warn("Failed to send APPEAL_DECIDED notification for appeal #{}: {}", appealId, e.getMessage());
-        }
+        CaseOwnerInfo caseInfo = caseClient.getCaseDetails(appeal.getCaseId());
+        events.publishEvent(new AppealEvent(
+            AppealEvent.Type.DECIDED,
+            appealId,
+            appeal.getCaseId(),
+            AppealService.stakeholders(appeal.getFiledByUserId(), caseInfo, review.getJudgeId()),
+            "Appeal #" + appealId + " for case #" + appeal.getCaseId()
+                + " has been decided. Outcome: " + outcome.name()
+        ));
 
         return toReviewResponse(review);
     }
@@ -182,7 +232,9 @@ public class ReviewService {
      * Update the draft outcome while the appeal is still REVIEWED.
      * Does NOT transition the appeal to DECIDED — call issueDecision() for that.
      */
-    public ReviewResponse updateReviewOutcome(Long reviewId, ReviewOutcome outcome) {
+    @Transactional
+    public ReviewResponse updateReviewOutcome(Long reviewId, ReviewOutcome outcome,
+                                              String actorUserId, String actorRole) {
         Review review = reviewRepository.findById(reviewId)
             .orElseThrow(() -> new ResourceNotFoundException("Review not found: #" + reviewId));
 
@@ -193,8 +245,16 @@ public class ReviewService {
                 + " is not in REVIEWED state. Current state: " + appeal.getStatus());
         }
 
+        ReviewOutcome prior = review.getOutcome();
         review.setOutcome(outcome);
-        return toReviewResponse(reviewRepository.save(review));
+        Review saved = reviewRepository.save(review);
+
+        audit.record(review.getAppealId(), Action.OUTCOME_DRAFT_UPDATED,
+            actorUserId, actorRole,
+            AppealStatus.REVIEWED, AppealStatus.REVIEWED,
+            "previousOutcome=" + prior + ";newOutcome=" + outcome);
+
+        return toReviewResponse(saved);
     }
 
     // ─── Read Operations ─────────────────────────────────────────────────────
@@ -226,7 +286,7 @@ public class ReviewService {
             .orElseThrow(() -> new ResourceNotFoundException("Appeal not found: #" + id));
     }
 
-    private ReviewResponse toReviewResponse(Review r) {
+    ReviewResponse toReviewResponse(Review r) {
         return ReviewResponse.builder()
             .reviewId(r.getReviewId())
             .caseId(r.getCaseId())

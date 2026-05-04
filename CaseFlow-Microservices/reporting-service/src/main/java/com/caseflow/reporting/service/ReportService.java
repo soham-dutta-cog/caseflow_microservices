@@ -7,9 +7,9 @@ import com.caseflow.reporting.entity.Report;
 import java.util.List;
 
 public interface ReportService {
-    ReportResponse generateReport(ReportRequest request);
+    ReportResponse generateReport(ReportRequest request, String requestedBy);
     ReportResponse getReportById(Long id);
-    List<ReportResponse> getReportsByAdmin(Long id);
+    List<ReportResponse> getReportsByUser(String userId);
     List<ReportResponse> getReportsByScope(Report.ReportScope scope);
     List<ReportResponse> getReportsByScopeAndValue(Report.ReportScope scope, String scopeValue);
 }

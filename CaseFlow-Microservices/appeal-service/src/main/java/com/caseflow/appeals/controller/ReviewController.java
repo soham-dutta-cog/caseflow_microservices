@@ -41,13 +41,16 @@ public class ReviewController {
     @PostMapping("/{id}/review")
     public ResponseEntity<ReviewResponse> openForReview(
             @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id",   required = false) String currentUserId,
+            @Parameter(hidden = true)
             @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
             @PathVariable Long id,
             @Parameter(description = "Judge user ID to assign (IAM format, e.g. JOH_JUDGE_1)")
             @RequestParam String judgeId) {
 
         roleGuard.requireAnyRole(userRole, "CLERK", "ADMIN", "JUDGE");
-        return ResponseEntity.ok(reviewService.openForReview(id, judgeId));
+        roleGuard.requireUserId(currentUserId);
+        return ResponseEntity.ok(reviewService.openForReview(id, judgeId, currentUserId, userRole));
     }
 
     // ─── Get Review ───────────────────────────────────────────────────────────
@@ -141,11 +144,15 @@ public class ReviewController {
     @PatchMapping("/reviews/{reviewId}/outcome")
     public ResponseEntity<ReviewResponse> updateReviewOutcome(
             @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Id",   required = false) String currentUserId,
+            @Parameter(hidden = true)
             @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
             @PathVariable Long reviewId,
             @Valid @RequestBody UpdateOutcomeRequest request) {
 
         roleGuard.requireAnyRole(userRole, "ADMIN", "JUDGE");
-        return ResponseEntity.ok(reviewService.updateReviewOutcome(reviewId, request.getOutcome()));
+        roleGuard.requireUserId(currentUserId);
+        return ResponseEntity.ok(reviewService.updateReviewOutcome(
+            reviewId, request.getOutcome(), currentUserId, userRole));
     }
 }

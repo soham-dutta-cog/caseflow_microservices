@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
     try {
       const res = await authApi.login({ email, password }, rememberMe)
       setToken(res.token)
-      const u = { email: res.email, name: res.name, role: res.role }
+      const u = { email: res.email, name: res.name, role: res.role, userId: res.userId }
       setUser(u)
       setUserState(u)
       return res
@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, setUser: setUserState }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, setUser: (u) => { setUser(u); setUserState(u) } }}>
       {children}
     </AuthContext.Provider>
   )

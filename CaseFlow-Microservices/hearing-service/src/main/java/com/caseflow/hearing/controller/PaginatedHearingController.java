@@ -1,7 +1,6 @@
 package com.caseflow.hearing.controller;
 
 import com.caseflow.hearing.entity.Hearing;
-import com.caseflow.hearing.entity.Schedule;
 import com.caseflow.hearing.service.CachedHearingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Tag(name = "Hearings — Paginated", description = "Paginated hearing endpoints")
 public class PaginatedHearingController {
-
     private final CachedHearingService cachedHearingService;
 
     @GetMapping
@@ -29,13 +27,5 @@ public class PaginatedHearingController {
         String[] s = sort.split(",");
         return ResponseEntity.ok(cachedHearingService.getAllHearingsPaginated(
             PageRequest.of(page, size, Sort.by(s.length > 1 && s[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC, s[0]))));
-    }
-
-    @GetMapping("/schedules")
-    @Operation(summary = "Get all schedules (paginated)")
-    public ResponseEntity<Page<Schedule>> getAllSchedulesPaginated(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(cachedHearingService.getAllSchedulesPaginated(PageRequest.of(page, size)));
     }
 }

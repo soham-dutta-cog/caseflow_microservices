@@ -25,12 +25,29 @@ public class CaseService {
     public CaseResponse fileCase(CaseRequest request) {
         if (!iamClient.existsById(request.getLitigantId()))
             throw new ResourceNotFoundException("Litigant not found: " + request.getLitigantId());
+        
+        // Normalize lawyerId - treat empty string as null
+        String normalizedLawyerId = (request.getLawyerId() != null && !request.getLawyerId().trim().isEmpty()) 
+            ? request.getLawyerId().trim() 
+            : null;
+        
         Case newCase = Case.builder().title(request.getTitle()).litigantId(request.getLitigantId())
-            .lawyerId(request.getLawyerId()).filedDate(LocalDateTime.now())
+            .lawyerId(normalizedLawyerId).filedDate(LocalDateTime.now())
             .status(Case.CaseStatus.FILED).build();
         Case saved = caseRepository.save(newCase);
+        
+        log.info("Case filed - caseId: {}, litigantId: {}, lawyerId: {}", saved.getCaseId(), saved.getLitigantId(), saved.getLawyerId());
+        
         sendNotification(request.getLitigantId(), saved.getCaseId(),
             "Your case '" + saved.getTitle() + "' (Case #" + saved.getCaseId() + ") has been filed.", "CASE");
+        
+        if (saved.getLawyerId() != null && !saved.getLawyerId().isBlank()) {
+            log.info("Sending notification to lawyer: {}", saved.getLawyerId());
+            sendNotification(saved.getLawyerId(), saved.getCaseId(),
+                "You have been assigned to Case #" + saved.getCaseId() + " ('" + saved.getTitle() + "').", "CASE");
+        } else {
+            log.warn("No lawyer assigned to case - lawyerId is null or blank");
+        }
         return mapToCaseResponse(saved);
     }
 
@@ -130,6 +147,16 @@ public class CaseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Case not found: " + caseId));
         Case.CaseStatus oldStatus = existingCase.getStatus();
         existingCase.setStatus(newStatus);
+
+        // Stamp closedDate on the CLOSED transition; clear it if the case is reopened
+        // (e.g. an appeal moves the case back to ACTIVE / FILED) so deadlines are
+        // computed against the most recent close.
+        if (newStatus == Case.CaseStatus.CLOSED && oldStatus != Case.CaseStatus.CLOSED) {
+            existingCase.setClosedDate(LocalDateTime.now());
+        } else if (newStatus != Case.CaseStatus.CLOSED) {
+            existingCase.setClosedDate(null);
+        }
+
         Case saved = caseRepository.save(existingCase);
 
         log.info("Case {} status updated from {} to {} by user {}", caseId, oldStatus, newStatus, updatedBy);
@@ -165,18 +192,29 @@ public class CaseService {
 
     private void sendNotification(String userId, Long caseId, String message, String category) {
         try {
+            log.info("Preparing to send notification to userId: {}, caseId: {}, message: {}, category: {}", 
+                userId, caseId, message, category);
             Map<String, Object> req = new HashMap<>();
-            req.put("userId", userId); req.put("caseId", caseId);
-            req.put("message", message); req.put("category", category);
+            req.put("userId", userId); 
+            req.put("caseId", caseId);
+            req.put("message", message); 
+            req.put("category", category);
+            log.info("Sending notification payload: {}", req);
             notificationClient.sendNotification(req);
-        } catch (Exception e) { log.warn("Notification failed: {}", e.getMessage()); }
+            log.info("Notification sent successfully to userId: {}", userId);
+        } catch (Exception e) { 
+            log.warn("Notification failed for userId: {}, error: {}", userId, e.getMessage());
+            log.error("Notification exception details:", e);
+        }
     }
 
     private CaseResponse mapToCaseResponse(Case c) {
         CaseResponse res = new CaseResponse();
         res.setCaseId(c.getCaseId()); res.setTitle(c.getTitle());
         res.setLitigantId(c.getLitigantId()); res.setLawyerId(c.getLawyerId());
-        res.setFiledDate(c.getFiledDate()); res.setStatus(c.getStatus());
+        res.setFiledDate(c.getFiledDate());
+        res.setClosedDate(c.getClosedDate());
+        res.setStatus(c.getStatus());
         return res;
     }
 
