@@ -219,7 +219,12 @@ export default function AppealList() {
                         </td>
                         <td className="text-end">
                           <div className="d-flex gap-1 justify-content-end flex-wrap">
-                            <Link to={`/appeals/${a.appealId}`} className="btn btn-outline-secondary btn-sm">
+                            {/* Newly submitted appeals direct to the case they were filed for.
+                                Reviewed/Decided/Cancelled appeals open the appeal detail. */}
+                            <Link
+                              to={a.status === 'SUBMITTED' ? `/cases/${a.caseId}` : `/appeals/${a.appealId}`}
+                              className="btn btn-outline-secondary btn-sm"
+                            >
                               {t('Open')}
                             </Link>
                             {canCancel(a) && (
@@ -265,7 +270,10 @@ export default function AppealList() {
                       <span className="text-end" style={{ maxWidth: '70%' }}>{a.reason}</span>
                     </div>
                     <div className="appeal-row-card__actions">
-                      <Link to={`/appeals/${a.appealId}`} className="btn btn-outline-secondary btn-sm">
+                      <Link
+                        to={a.status === 'SUBMITTED' ? `/cases/${a.caseId}` : `/appeals/${a.appealId}`}
+                        className="btn btn-outline-secondary btn-sm"
+                      >
                         <i className="bi bi-eye me-1" /> {t('Open')}
                       </Link>
                       {canCancel(a) && (

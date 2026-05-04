@@ -1,7 +1,47 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Component, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { reports, users } from '../../api/services'
 import { REPORT_SCOPE, formatDate } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
+
+/* ─── Local error boundary so a render exception doesn't blank the page ─── */
+class SafeBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) {
+    // eslint-disable-next-line no-console
+    console.error('[ReportView] render error:', error, info?.componentStack)
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="alert alert-danger my-3">
+          <div className="fw-semibold">
+            <i className="bi bi-exclamation-octagon me-2" />
+            We hit an error rendering this report.
+          </div>
+          <div className="small mt-1">
+            <code>{String(this.state.error?.message || this.state.error)}</code>
+          </div>
+          <div className="small text-muted mt-1">
+            Open the browser console for the full stack trace, or try generating a fresh report.
+          </div>
+          <button
+            className="btn btn-outline-secondary btn-sm mt-2"
+            onClick={() => this.setState({ error: null })}
+          >
+            <i className="bi bi-arrow-clockwise me-1" />Reset
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+// Scopes shown in the dropdowns. CASE and COMPLIANCE are removed from
+// generation/filter UI but kept in SCOPE_CONFIG so old reports still render.
+const VISIBLE_SCOPES = REPORT_SCOPE.filter(s => s !== 'CASE' && s !== 'COMPLIANCE')
 
 /* ─── Scope configuration ───────────────────────────────────────────────── */
 const SCOPE_CONFIG = {
@@ -19,12 +59,16 @@ const SCOPE_CONFIG = {
   JUDGE: {
     color: '#6f42c1', bg: '#f5f0ff', border: '#d8b4fe',
     icon: 'bi-person-badge', label: 'Judge Performance Report',
-    description: 'Tracks hearings presided, appeals reviewed and decisions issued by a specific judge. Judges do not verify documents or manage SLA stages.',
+    description: 'Tracks hearings assigned to this judge and appeals routed to them — how many were completed, how many are still in progress.',
     valueLabel: 'Select Judge', roleDropdown: 'JUDGE',
     valueHint: 'Select the judge from the dropdown — scope value will be their User ID.',
     showDate: true,
     sections: ['hearings', 'appeals', 'summary'],
-    sectionTitles: { hearings: 'Hearings Presided', appeals: 'Appeals Reviewed & Decided', summary: 'Cases Assigned' },
+    sectionTitles: {
+      hearings: 'Hearings Assigned to Judge',
+      appeals:  'Appeals Assigned to Judge',
+      summary:  'Cases Assigned',
+    },
   },
   PERIOD: {
     color: '#0891b2', bg: '#f0fdff', border: '#a5f3fc',
@@ -43,13 +87,15 @@ const SCOPE_CONFIG = {
     valueLabel: 'Select Clerk', roleDropdown: 'CLERK',
     valueHint: 'Select the clerk from the dropdown — scope value will be their User ID.',
     showDate: true,
-    sections: ['documents', 'hearings', 'sla', 'compliance'],
+    sections: ['hearings', 'appeals', 'documents', 'sla', 'compliance'],
     sectionTitles: {
-      documents: 'Documents Verified',
-      hearings: 'Hearings Scheduled',
-      sla: 'SLA Stages Managed',
-      compliance: 'Compliance Checks Run',
+      hearings:   'Hearings Scheduled by Clerk',
+      appeals:    'Appeals Routed by Clerk (Judge Assigned)',
+      documents:  'Documents Verified by Clerk',
+      sla:        'SLA Stages (system-wide)',
+      compliance: 'Compliance Checks (system-wide)',
     },
+    perClerkNote: 'Hearings, Appeals and Documents are filtered to this clerk\'s actions — hearings they scheduled, appeals they routed (assigned a judge to), and documents they verified or rejected. SLA stages and compliance checks are not attributed per-clerk in the database, so those sections show system-wide totals.',
   },
   LAWYER: {
     color: '#fd7e14', bg: '#fff7ed', border: '#fed7aa',
@@ -201,33 +247,55 @@ function hasData(obj) {
 }
 
 /* ─── Role-specific KPI definitions ─────────────────────────────────────── */
-function getRoleKpis(scope, m) {
+function getRoleKpis(scope, metrics) {
+  // Defensive: callers may pass null / partially-populated metrics. Coerce to a
+  // safe shape so any property access below is null-safe.
+  const m = metrics || {}
   const clearanceRate   = m.summary?.caseClearanceRate     ?? 0
   const slaAdherence    = m.sla?.slaAdherenceRate          ?? 0
   const compliancePass  = m.compliance?.compliancePassRate ?? 0
   const hearingComplete = m.hearings?.hearingCompletionRate ?? 0
   const verifyRate      = m.documents?.documentVerificationRate ?? 0
 
-  if (scope === 'JUDGE') return [
-    { label: 'Hearings Presided',  mainValue: m.hearings?.hearingsCompleted ?? 0, sub: `of ${m.hearings?.totalHearings ?? 0} total`,    icon: 'bi-calendar-event' },
-    { label: 'Completion Rate',    mainValue: `${hearingComplete}%`,              pct: hearingComplete, tone: hearingComplete >= 70 ? 'success' : 'warning', sub: 'Hearings completed' },
-    { label: 'Appeals Decided',    mainValue: m.appeals?.appealsDecided ?? 0,     sub: `of ${m.appeals?.totalAppeals ?? 0} reviewed`,    icon: 'bi-gavel' },
-    { label: 'Cases Assigned',     mainValue: m.summary?.totalCasesFiled ?? 0,    sub: `${m.summary?.casesClosed ?? 0} closed`,          icon: 'bi-folder2-open' },
-  ]
+  if (scope === 'JUDGE') {
+    const aTotal     = m.appeals?.totalAppeals       ?? 0
+    const aInProcess = m.appeals?.appealsUnderReview ?? 0
+    const aDone      = m.appeals?.appealsDecided     ?? 0
+    const reviewRate = aTotal > 0 ? Math.round((aDone * 100) / aTotal) : 0
+    return [
+      { label: 'Cases Assigned',     mainValue: m.summary?.totalCasesFiled ?? 0,    sub: `${m.summary?.casesActive ?? 0} active · ${m.summary?.casesClosed ?? 0} closed`, icon: 'bi-folder2-open' },
+      { label: 'Hearings Completed', mainValue: m.hearings?.hearingsCompleted ?? 0, sub: `of ${m.hearings?.totalHearings ?? 0} hearings · ${m.hearings?.hearingsRescheduled ?? 0} delayed`, icon: 'bi-calendar-check' },
+      { label: 'Appeals Assigned',   mainValue: aTotal,                              sub: `${aInProcess} in process · ${aDone} done`, icon: 'bi-arrow-repeat' },
+      { label: 'Reviews Completed',  mainValue: aDone,                               pct: reviewRate, tone: 'success', sub: `${reviewRate}% of assigned` },
+    ]
+  }
 
-  if (scope === 'CLERK') return [
-    { label: 'Documents Verified', mainValue: m.documents?.verifiedDocuments ?? 0, sub: `of ${m.documents?.totalDocuments ?? 0} total`,  icon: 'bi-file-earmark-check' },
-    { label: 'Verification Rate',  mainValue: `${verifyRate}%`,                    pct: verifyRate,    tone: verifyRate >= 70 ? 'success' : 'warning',  sub: 'Docs verified' },
-    { label: 'Hearings Scheduled', mainValue: m.hearings?.hearingsScheduled ?? 0,  sub: `${m.hearings?.totalHearings ?? 0} total hearings`,                icon: 'bi-calendar-plus' },
-    { label: 'SLA Adherence',      mainValue: `${slaAdherence}%`,                  pct: slaAdherence,  tone: (m.sla?.slaBreaches ?? 0) > 0 ? 'danger' : 'success', sub: `${m.sla?.slaBreaches ?? 0} breach${(m.sla?.slaBreaches ?? 0) !== 1 ? 'es' : ''}` },
-  ]
+  if (scope === 'CLERK') {
+    const aTotal = m.appeals?.totalAppeals       ?? 0
+    const aWait  = m.appeals?.appealsUnderReview ?? 0
+    const aDone  = m.appeals?.appealsDecided     ?? 0
+    const docTotal    = m.documents?.totalDocuments     ?? 0
+    const docVerified = m.documents?.verifiedDocuments  ?? 0
+    const docRejected = m.documents?.rejectedDocuments  ?? 0
+    return [
+      { label: 'Hearings Scheduled',   mainValue: m.hearings?.totalHearings ?? 0, sub: `${m.hearings?.hearingsCompleted ?? 0} completed · ${m.hearings?.hearingsRescheduled ?? 0} delayed`, icon: 'bi-calendar-plus' },
+      { label: 'Appeals Routed',       mainValue: aTotal,                         sub: `${aWait} awaiting decision · ${aDone} done`, icon: 'bi-arrow-repeat' },
+      { label: 'Docs Acted On',        mainValue: docTotal,                        sub: `${docVerified} verified · ${docRejected} rejected`, icon: 'bi-file-earmark-check' },
+      { label: 'SLA Adherence (sys)',  mainValue: `${slaAdherence}%`,             pct: slaAdherence, tone: (m.sla?.slaBreaches ?? 0) > 0 ? 'danger' : 'success', sub: `${m.sla?.slaBreaches ?? 0} breach${(m.sla?.slaBreaches ?? 0) !== 1 ? 'es' : ''}` },
+    ]
+  }
 
-  if (scope === 'LAWYER') return [
-    { label: 'Cases Represented',  mainValue: m.summary?.totalCasesFiled ?? 0,    sub: `${m.summary?.casesActive ?? 0} still active`,    icon: 'bi-briefcase' },
-    { label: 'Active Cases',       mainValue: m.summary?.casesActive ?? 0,        sub: `${m.summary?.casesClosed ?? 0} closed`,          icon: 'bi-folder' },
-    { label: 'Appeals Filed',      mainValue: m.appeals?.appealsFiled ?? 0,       sub: `${m.appeals?.appealsDecided ?? 0} decided`,      icon: 'bi-arrow-repeat' },
-    { label: 'Cases Closed',       mainValue: m.summary?.casesClosed ?? 0,        sub: `${m.summary?.casesAdjourned ?? 0} adjourned`,    icon: 'bi-check2-circle', tone: 'success' },
-  ]
+  if (scope === 'LAWYER') {
+    const aTotal = m.appeals?.totalAppeals       ?? 0
+    const aWait  = m.appeals?.appealsUnderReview ?? 0
+    const aDone  = m.appeals?.appealsDecided     ?? 0
+    return [
+      { label: 'Cases Represented',  mainValue: m.summary?.totalCasesFiled ?? 0,    sub: `${m.summary?.casesActive ?? 0} still active`,           icon: 'bi-briefcase' },
+      { label: 'Active Cases',       mainValue: m.summary?.casesActive ?? 0,        sub: `${m.summary?.casesClosed ?? 0} closed`,                 icon: 'bi-folder' },
+      { label: 'Appeals Filed',      mainValue: aTotal,                              sub: `${aWait} under review · ${aDone} decided`,             icon: 'bi-arrow-repeat' },
+      { label: 'Cases Closed',       mainValue: m.summary?.casesClosed ?? 0,        sub: `${m.summary?.casesAdjourned ?? 0} adjourned`,           icon: 'bi-check2-circle', tone: 'success' },
+    ]
+  }
 
   // COURT, PERIOD, CASE, COMPLIANCE — show all-round KPIs
   return [
@@ -265,13 +333,25 @@ function exportCsv(report) {
 export default function ReportList() {
   const { user } = useAuth()
 
-  const [list, setList]               = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [err, setErr]                 = useState('')
-  const [msg, setMsg]                 = useState('')
-  const [generating, setGenerating]   = useState(false)
-  const [selected, setSelected]       = useState(null)
-  const [filterScope, setFilterScope] = useState('')
+  const [list, setList]                       = useState([])
+  const [loading, setLoading]                 = useState(true)
+  const [err, setErr]                         = useState('')
+  const [msg, setMsg]                         = useState('')
+  const [generating, setGenerating]           = useState(false)
+  const [selected, setSelected]               = useState(null)
+  const [filterScope, setFilterScope]         = useState('')
+  const [deletingReportId, setDeletingReportId] = useState(null)
+
+  const deleteReport = async (id) => {
+    if (!window.confirm(`Delete report #${id}? This cannot be undone.`)) return
+    setDeletingReportId(id); setErr(''); setMsg('')
+    try {
+      await reports.del(id)
+      setMsg(`Report #${id} deleted.`)
+      setList(prev => prev.filter(r => r.reportId !== id))
+      if (selected?.reportId === id) setSelected(null)
+    } catch (e) { setErr(e.message) } finally { setDeletingReportId(null) }
+  }
 
   // role-user dropdown state
   const [roleUsers, setRoleUsers]       = useState([])
@@ -352,7 +432,12 @@ export default function ReportList() {
 
     const accentColor = reportCfg?.color
 
-    if (key === 'summary' && hasData(m.summary)) return (
+    // Sections that are explicitly listed in this scope's config should render
+    // even when the data is empty — so the user can see the report ran for the
+    // selected role and the absence of activity is meaningful (not a bug).
+    const inScope = Array.isArray(reportCfg?.sections) && reportCfg.sections.includes(key)
+
+    if (key === 'summary' && (inScope || hasData(m.summary))) return (
       <div className="col-md-6" key="summary">
         <SectionCard title={title} icon="bi-folder2-open" accentColor={accentColor}>
           <DistBar segments={[
@@ -371,8 +456,16 @@ export default function ReportList() {
       </div>
     )
 
-    if (key === 'hearings' && hasData(m.hearings)) {
+    if (key === 'hearings' && (inScope || hasData(m.hearings))) {
       const hearingComplete = m.hearings?.hearingCompletionRate ?? 0
+      const reportScope = reportCfg && Object.keys(SCOPE_CONFIG).find(k => SCOPE_CONFIG[k] === reportCfg)
+      // Scope-specific labels for the distribution segments
+      const segLabels =
+        reportScope === 'JUDGE'
+          ? { completed: 'Completed by Judge', scheduled: 'Scheduled to Judge', rescheduled: 'Delayed', cancelled: 'Cancelled' }
+        : reportScope === 'CLERK'
+          ? { completed: 'Completed', scheduled: 'Currently Scheduled', rescheduled: 'Rescheduled', cancelled: 'Cancelled' }
+        : { completed: 'Completed', scheduled: 'Scheduled', rescheduled: 'Rescheduled', cancelled: 'Cancelled' }
       return (
         <div className="col-md-6" key="hearings">
           <SectionCard title={title} icon="bi-calendar-event" accentColor={accentColor}>
@@ -381,21 +474,24 @@ export default function ReportList() {
                 tone={hearingComplete >= 70 ? 'success' : 'warning'} />
               <div>
                 <div className="fw-semibold">{hearingComplete}% completion rate</div>
-                <div className="text-muted small">{m.hearings?.totalHearings ?? 0} total hearings</div>
+                <div className="text-muted small">
+                  {m.hearings?.totalHearings ?? 0} total
+                  {reportScope === 'JUDGE' ? ' assigned to judge' : reportScope === 'CLERK' ? ' scheduled by clerk' : ' hearings'}
+                </div>
               </div>
             </div>
             <DistBar segments={[
-              { label: 'Completed',   value: m.hearings?.hearingsCompleted   ?? 0, color: '#198754' },
-              { label: 'Scheduled',   value: m.hearings?.hearingsScheduled   ?? 0, color: '#0d6efd' },
-              { label: 'Rescheduled', value: m.hearings?.hearingsRescheduled ?? 0, color: '#f59e0b' },
-              { label: 'Cancelled',   value: m.hearings?.hearingsCancelled   ?? 0, color: '#dee2e6' },
+              { label: segLabels.completed,   value: m.hearings?.hearingsCompleted   ?? 0, color: '#198754' },
+              { label: segLabels.scheduled,   value: m.hearings?.hearingsScheduled   ?? 0, color: '#0d6efd' },
+              { label: segLabels.rescheduled, value: m.hearings?.hearingsRescheduled ?? 0, color: '#f59e0b' },
+              { label: segLabels.cancelled,   value: m.hearings?.hearingsCancelled   ?? 0, color: '#dee2e6' },
             ]} />
           </SectionCard>
         </div>
       )
     }
 
-    if (key === 'documents' && hasData(m.documents)) return (
+    if (key === 'documents' && (inScope || hasData(m.documents))) return (
       <div className="col-md-6" key="documents">
         <SectionCard title={title} icon="bi-file-earmark-text" accentColor={accentColor}>
           <DistBar segments={[
@@ -416,7 +512,7 @@ export default function ReportList() {
       </div>
     )
 
-    if (key === 'sla' && hasData(m.sla)) {
+    if (key === 'sla' && (inScope || hasData(m.sla))) {
       const slaAdherence = m.sla?.slaAdherenceRate ?? 0
       return (
         <div className="col-md-6" key="sla">
@@ -440,65 +536,125 @@ export default function ReportList() {
       )
     }
 
-    if (key === 'appeals' && hasData(m.appeals)) return (
-      <div className="col-md-6" key="appeals">
-        <SectionCard title={title} icon="bi-arrow-repeat" accentColor={accentColor}>
-          <DistBar segments={[
-            { label: 'Filed',        value: m.appeals?.appealsFiled       ?? 0, color: '#0d6efd' },
-            { label: 'Under Review', value: m.appeals?.appealsUnderReview ?? 0, color: '#f59e0b' },
-            { label: 'Decided',      value: m.appeals?.appealsDecided     ?? 0, color: '#198754' },
-          ]} />
-          <div className="mt-3 text-muted small">
-            <div>
-              <strong>{m.appeals?.appealRate ?? 0}%</strong> of cases appealed
-              <span className="ms-1">({m.appeals?.casesWithAppeals ?? 0} of {m.summary?.totalCasesFiled ?? 0})</span>
-            </div>
-            <div className="mt-1">Avg <strong>{m.appeals?.appealsPerCase ?? 0}</strong> appeals per case</div>
-          </div>
-          {m.appeals?.outcomes && hasData(m.appeals.outcomes) && (
-            <div className="d-flex gap-1 flex-wrap mt-2">
-              {m.appeals.outcomes.upheld    > 0 && <span className="badge text-bg-success">Upheld {m.appeals.outcomes.upheld}</span>}
-              {m.appeals.outcomes.reversed  > 0 && <span className="badge text-bg-danger">Reversed {m.appeals.outcomes.reversed}</span>}
-              {m.appeals.outcomes.modified  > 0 && <span className="badge text-bg-info">Modified {m.appeals.outcomes.modified}</span>}
-              {m.appeals.outcomes.sentBack  > 0 && <span className="badge text-bg-warning">Sent Back {m.appeals.outcomes.sentBack}</span>}
-              {m.appeals.outcomes.dismissed > 0 && <span className="badge text-bg-secondary">Dismissed {m.appeals.outcomes.dismissed}</span>}
-            </div>
-          )}
-        </SectionCard>
-      </div>
-    )
-
-    if (key === 'compliance' && hasData(m.compliance)) {
-      const compliancePass = m.compliance?.compliancePassRate ?? 0
+    if (key === 'appeals') {
+      const a = m.appeals || {}
+      const filed     = a.appealsFiled       ?? 0
+      const assigned  = a.appealsUnderReview ?? 0
+      const completed = a.appealsDecided     ?? 0
+      // Scope-specific labels for the 3-stat strip
+      const reportScope = reportCfg && Object.keys(SCOPE_CONFIG).find(k => SCOPE_CONFIG[k] === reportCfg)
+      const labels =
+        reportScope === 'JUDGE'
+          ? { a: 'Appeals Assigned to Me', b: 'In Process',         c: 'Reviews Completed' }
+        : reportScope === 'CLERK'
+          ? { a: 'Appeals I Routed',       b: 'Awaiting Decision',  c: 'Review Completed' }
+        : { a: 'Cases Appealed',         b: 'Assigned to Judge',  c: 'Review Completed' }
       return (
-        <div className="col-md-6" key="compliance">
-          <SectionCard title={title} icon="bi-clipboard-check" accentColor={accentColor}>
-            <div className="d-flex align-items-center gap-3 mb-3">
-              <DonutChart value={compliancePass} max={100} size={60} strokeWidth={8}
-                tone={(m.compliance?.complianceFailures ?? 0) > 0 ? 'warning' : 'success'} />
-              <div>
-                <div className="fw-semibold">{compliancePass}% pass rate</div>
-                <div className="text-muted small">{m.compliance?.totalComplianceChecks ?? 0} total checks</div>
+        <div className="col-md-6" key="appeals">
+          <SectionCard title={title} icon="bi-arrow-repeat" accentColor={accentColor}>
+            {/* Always shown 3-stat strip */}
+            <div className="row text-center g-2 mb-3">
+              <div className="col-4">
+                <div className="p-2 rounded-3" style={{ background: '#eff6ff' }}>
+                  <div className="h4 fw-bold mb-0 text-primary">{filed}</div>
+                  <div className="text-muted small mt-1">{labels.a}</div>
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="p-2 rounded-3" style={{ background: '#fff7ed' }}>
+                  <div className="h4 fw-bold mb-0 text-warning">{assigned}</div>
+                  <div className="text-muted small mt-1">{labels.b}</div>
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="p-2 rounded-3" style={{ background: '#f0fdf4' }}>
+                  <div className="h4 fw-bold mb-0 text-success">{completed}</div>
+                  <div className="text-muted small mt-1">{labels.c}</div>
+                </div>
               </div>
             </div>
-            <DistBar segments={[
-              { label: 'Passed', value: m.compliance?.compliancePasses   ?? 0, color: '#198754' },
-              { label: 'Failed', value: m.compliance?.complianceFailures ?? 0, color: '#adb5bd' },
-            ]} />
-            {((m.compliance?.complianceDocumentFailures ?? 0) > 0 || (m.compliance?.complianceProcessFailures ?? 0) > 0) && (
-              <div className="d-flex gap-2 flex-wrap mt-2">
-                {(m.compliance?.complianceDocumentFailures ?? 0) > 0 && (
-                  <span className="badge text-bg-warning">
-                    <i className="bi bi-file-earmark-x me-1" />Doc failures: {m.compliance.complianceDocumentFailures}
-                  </span>
-                )}
-                {(m.compliance?.complianceProcessFailures ?? 0) > 0 && (
-                  <span className="badge text-bg-secondary">
-                    <i className="bi bi-diagram-3 me-1" />Process failures: {m.compliance.complianceProcessFailures}
-                  </span>
-                )}
+
+            {/* Distribution bar (only when there is data) */}
+            {(filed + assigned + completed) > 0 && (
+              <DistBar segments={[
+                { label: 'Filed',           value: filed,     color: '#0d6efd' },
+                { label: 'Assigned',        value: assigned,  color: '#f59e0b' },
+                { label: 'Review Complete', value: completed, color: '#198754' },
+              ]} />
+            )}
+
+            <div className="mt-3 text-muted small">
+              <div>
+                <strong>{a.appealRate ?? 0}%</strong> of cases appealed
+                <span className="ms-1">({a.casesWithAppeals ?? 0} of {m.summary?.totalCasesFiled ?? 0})</span>
+              </div>
+              {(a.appealsPerCase ?? 0) > 0 && (
+                <div className="mt-1">Avg <strong>{a.appealsPerCase}</strong> appeals per case</div>
+              )}
+            </div>
+
+            {a.outcomes && hasData(a.outcomes) && (
+              <div className="d-flex gap-1 flex-wrap mt-2">
+                {a.outcomes.upheld    > 0 && <span className="badge text-bg-success">Upheld {a.outcomes.upheld}</span>}
+                {a.outcomes.reversed  > 0 && <span className="badge text-bg-danger">Reversed {a.outcomes.reversed}</span>}
+                {a.outcomes.modified  > 0 && <span className="badge text-bg-info">Modified {a.outcomes.modified}</span>}
+                {a.outcomes.sentBack  > 0 && <span className="badge text-bg-warning">Sent Back {a.outcomes.sentBack}</span>}
+                {a.outcomes.dismissed > 0 && <span className="badge text-bg-secondary">Dismissed {a.outcomes.dismissed}</span>}
               </div>
             )}
+          </SectionCard>
+        </div>
+      )
+    }
+
+    if (key === 'compliance' && (inScope || hasData(m.compliance))) {
+      // No PASS/FAIL display. Show compliance activity stats: total checks performed,
+      // breakdown of where issues showed up (documents vs SLA process), and a deep
+      // link to the full Compliance History page for the per-run drill-down.
+      const total      = m.compliance?.totalComplianceChecks   ?? 0
+      const docIssues  = m.compliance?.complianceDocumentFailures ?? 0
+      const procIssues = m.compliance?.complianceProcessFailures ?? 0
+      const issues     = docIssues + procIssues
+      const clean      = Math.max(0, total - issues)
+      return (
+        <div className="col-md-6" key="compliance">
+          <SectionCard title="Compliance Activity" icon="bi-clipboard-check" accentColor={accentColor}>
+            <div className="row text-center g-2 mb-3">
+              <div className="col-4">
+                <div className="p-2 rounded-3 border">
+                  <div className="h4 mb-0 fw-bold">{total}</div>
+                  <div className="text-muted small">Checks Run</div>
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="p-2 rounded-3" style={{ background: '#f0fdf4' }}>
+                  <div className="h4 mb-0 fw-bold text-success">{clean}</div>
+                  <div className="text-muted small">In Good Standing</div>
+                </div>
+              </div>
+              <div className="col-4">
+                <div className="p-2 rounded-3" style={{ background: issues > 0 ? '#fff7ed' : '#f8f9fa' }}>
+                  <div className={`h4 mb-0 fw-bold ${issues > 0 ? 'text-warning' : 'text-muted'}`}>{issues}</div>
+                  <div className="text-muted small">Items Flagged</div>
+                </div>
+              </div>
+            </div>
+
+            {issues > 0 && (
+              <div>
+                <div className="text-muted small mb-2">Where issues were flagged</div>
+                <DistBar segments={[
+                  { label: 'Document issues',  value: docIssues,  color: '#f59e0b' },
+                  { label: 'SLA / process',    value: procIssues, color: '#0d6efd' },
+                ]} />
+              </div>
+            )}
+
+            <div className="mt-3 small">
+              <Link to="/compliance" className="text-decoration-none">
+                <i className="bi bi-clock-history me-1" />Open full Compliance History &rarr;
+              </Link>
+            </div>
           </SectionCard>
         </div>
       )
@@ -590,7 +746,7 @@ export default function ReportList() {
                   disabled={generating}
                   style={{ borderColor: cfg?.border }}
                 >
-                  {REPORT_SCOPE.map(s => {
+                  {VISIBLE_SCOPES.map(s => {
                     const c = SCOPE_CONFIG[s]
                     return <option key={s} value={s}>{s} — {c?.label || s}</option>
                   })}
@@ -680,10 +836,12 @@ export default function ReportList() {
       </div>
 
       {/* ── Selected report analytics ────────────────────────────────────── */}
-      {selected && metrics && (() => {
+      {selected && metrics && (
+        <SafeBoundary>
+          {(() => {
         const reportCfg  = SCOPE_CONFIG[selected.scope]
-        const m          = metrics
-        const kpiCards   = getRoleKpis(selected.scope, m)
+        const m          = metrics || {}
+        const kpiCards   = getRoleKpis(selected.scope, m) || []
         const sections   = reportCfg?.sections || ['summary', 'hearings', 'sla', 'documents', 'appeals', 'compliance']
 
         return (
@@ -720,6 +878,14 @@ export default function ReportList() {
             </div>
 
             <div className="card-body">
+              {/* Per-clerk attribution note (only shown for CLERK reports) */}
+              {reportCfg?.perClerkNote && (
+                <div className="alert alert-info py-2 small mb-3 d-flex align-items-start gap-2">
+                  <i className="bi bi-info-circle-fill mt-1" style={{ flexShrink: 0 }} />
+                  <div>{reportCfg.perClerkNote}</div>
+                </div>
+              )}
+
               {/* Role-specific KPI strip */}
               <div className="row g-3 mb-4">
                 {kpiCards.map((kpi, i) => (
@@ -745,6 +911,8 @@ export default function ReportList() {
           </div>
         )
       })()}
+        </SafeBoundary>
+      )}
 
       {/* ── Report history ───────────────────────────────────────────────── */}
       <div className="card shadow-sm border-0">
@@ -760,7 +928,7 @@ export default function ReportList() {
             <select className="form-select form-select-sm" style={{ width: 160 }}
               value={filterScope} onChange={e => setFilterScope(e.target.value)}>
               <option value="">All scopes</option>
-              {REPORT_SCOPE.map(s => <option key={s} value={s}>{s}</option>)}
+              {VISIBLE_SCOPES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
             <button className="btn btn-outline-secondary btn-sm" onClick={load}>
               <i className="bi bi-arrow-clockwise me-1" />Refresh
@@ -811,6 +979,18 @@ export default function ReportList() {
                           <button className="btn btn-outline-success btn-sm" onClick={() => exportCsv(r)} title="Download CSV">
                             <i className="bi bi-file-earmark-spreadsheet" />
                           </button>
+                          {user?.role === 'ADMIN' && (
+                            <button
+                              className="btn btn-outline-danger btn-sm"
+                              title="Delete this report"
+                              disabled={deletingReportId === r.reportId}
+                              onClick={() => deleteReport(r.reportId)}
+                            >
+                              {deletingReportId === r.reportId
+                                ? <span className="spinner-border spinner-border-sm" />
+                                : <i className="bi bi-trash3" />}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

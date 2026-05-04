@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { cases, hearings, appeals, compliance, workflow } from '../../api/services'
-import { CASE_STATUS, DOC_TYPES, DOC_VERIFICATION, REVIEW_OUTCOME_LABELS, statusBadgeClass, formatDate, formatDateTime } from '../../utils/constants'
+import {
+  CASE_STATUS, DOC_TYPES, DOC_VERIFICATION, REVIEW_OUTCOME_LABELS,
+  statusBadgeClass, formatDate, formatDateTime,
+  UPLOAD_ALLOWED_EXTENSIONS, UPLOAD_ACCEPT_ATTR, validateUpload, formatBytes,
+} from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../api/client'
 
@@ -49,19 +53,37 @@ export default function CaseDetail() {
   const uploadDoc = async (e) => {
     e.preventDefault()
     setErr(''); setMsg('')
+
+    // Client-side validation: a file OR a URI must be provided.
+    if (!uploadForm.file && !uploadForm.uri) {
+      const m = 'Please attach a file or provide an external URI.'
+      setErr(m); window.alert(m); return
+    }
+    if (uploadForm.file) {
+      const v = validateUpload(uploadForm.file)
+      if (v) { setErr(v); window.alert(v); return }
+    }
+
     try {
       const fd = new FormData()
       fd.append('caseId', caseId)
       fd.append('title', uploadForm.title)
       fd.append('type', uploadForm.type)
       fd.append('uploadedBy', user.email)
-      if (uploadForm.uri) fd.append('uri', uploadForm.uri)
+      if (uploadForm.uri)  fd.append('uri',  uploadForm.uri)
       if (uploadForm.file) fd.append('file', uploadForm.file)
       await cases.uploadDoc(fd)
       setMsg('Document uploaded')
       setUploadForm({ title: '', type: 'PETITION', uri: '', file: null })
+      // reset the native <input type="file"> too
+      const fi = document.getElementById('case-doc-file')
+      if (fi) fi.value = ''
       load()
-    } catch (e) { setErr(e.message) }
+    } catch (e) {
+      // Surface backend errors clearly (e.g., file too large / bad type if frontend pre-check missed it)
+      const msg = e?.message || 'Upload failed.'
+      setErr(msg); window.alert(msg)
+    }
   }
 
   const updateStatus = async () => {
@@ -79,7 +101,7 @@ export default function CaseDetail() {
       if (!rejectionReason) return
     }
     try {
-      await cases.verifyDoc(doc.documentId, { status, rejectionReason, clerkId: user.email })
+      await cases.verifyDoc(doc.documentId, { status, rejectionReason, clerkId: user.userId || user.email })
       setMsg(`Document ${status.toLowerCase()}`)
       load()
     } catch (e) { setErr(e.message) }
@@ -189,28 +211,93 @@ export default function CaseDetail() {
           {canUpload && (
             <form onSubmit={uploadDoc} className="border-top pt-3 mt-3">
               <h4 className="h6 mb-3">Upload Document</h4>
+
+              {/* Constraint banner — always visible at the top of the form */}
+              <div className="alert alert-info py-2 small d-flex align-items-start gap-2 mb-3">
+                <i className="bi bi-info-circle-fill mt-1" style={{ flexShrink: 0 }} />
+                <div>
+                  <div><strong>Upload limits</strong></div>
+                  <div>Max file size: <strong>10 MB</strong></div>
+                  <div>Allowed types: <strong>{UPLOAD_ALLOWED_EXTENSIONS.join(', ')}</strong></div>
+                </div>
+              </div>
+
               <div className="row g-3">
                 <div className="col-md-6">
                   <label className="form-label fw-semibold small">Title</label>
-                  <input className="form-control" value={uploadForm.title} onChange={e => setUploadForm({ ...uploadForm, title: e.target.value })} minLength={2} maxLength={255} required />
+                  <input className="form-control" value={uploadForm.title}
+                    onChange={e => setUploadForm({ ...uploadForm, title: e.target.value })}
+                    minLength={2} maxLength={255} required />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-semibold small">Type</label>
-                  <select className="form-select" value={uploadForm.type} onChange={e => setUploadForm({ ...uploadForm, type: e.target.value })}>
+                  <select className="form-select" value={uploadForm.type}
+                    onChange={e => setUploadForm({ ...uploadForm, type: e.target.value })}>
                     {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-semibold small">External URI (optional)</label>
-                  <input className="form-control" value={uploadForm.uri} onChange={e => setUploadForm({ ...uploadForm, uri: e.target.value })} />
+                  <input className="form-control" value={uploadForm.uri}
+                    onChange={e => setUploadForm({ ...uploadForm, uri: e.target.value })} />
                 </div>
                 <div className="col-md-6">
                   <label className="form-label fw-semibold small">File (optional)</label>
-                  <input className="form-control" type="file" onChange={e => setUploadForm({ ...uploadForm, file: e.target.files[0] })} />
+                  <input
+                    id="case-doc-file"
+                    className="form-control"
+                    type="file"
+                    accept={UPLOAD_ACCEPT_ATTR}
+                    onChange={e => {
+                      const f = e.target.files[0] || null
+                      if (f) {
+                        const v = validateUpload(f)
+                        if (v) {
+                          window.alert(v)
+                          setErr(v)
+                          e.target.value = ''
+                          setUploadForm({ ...uploadForm, file: null })
+                          return
+                        }
+                      }
+                      setErr('')
+                      setUploadForm({ ...uploadForm, file: f })
+                    }}
+                  />
+                  <div className="form-text small">
+                    Max 10 MB. Allowed: {UPLOAD_ALLOWED_EXTENSIONS.join(', ')}
+                  </div>
+                  {uploadForm.file && (
+                    <div className="text-success small mt-1">
+                      <i className="bi bi-check-circle me-1" />
+                      Selected: <strong>{uploadForm.file.name}</strong>{' '}
+                      <span className="text-muted">({formatBytes(uploadForm.file.size)})</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              <button className="btn btn-dark mt-3">Upload</button>
+              <button className="btn btn-dark mt-3">
+                <i className="bi bi-upload me-1" />Upload
+              </button>
             </form>
+          )}
+
+          {/* Litigant has a lawyer — explain that they don't upload directly. */}
+          {!canUpload && user?.role === 'LITIGANT' && c.lawyerId && (
+            <div className="border-top pt-3 mt-3">
+              <div className="alert alert-info py-3 mb-0 d-flex align-items-start gap-3"
+                style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
+                <i className="bi bi-person-check-fill" style={{ fontSize: '1.4rem', color: '#0d6efd', flexShrink: 0 }} />
+                <div>
+                  <div className="fw-semibold mb-1">Your lawyer handles document uploads</div>
+                  <div className="small text-muted">
+                    Lawyer <strong>{c.lawyerId}</strong> is assigned to your case and will upload the required
+                    documents on your behalf. You'll receive a notification each time a document is uploaded,
+                    verified, or rejected.
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

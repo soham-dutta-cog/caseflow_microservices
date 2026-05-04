@@ -22,6 +22,7 @@ public class WorkflowService {
     private final CaseServiceClient caseClient;
     private final NotificationServiceClient notificationClient;
     private final CachedWorkflowService cachedWorkflowService;
+    private final IamServiceClient iamClient;
 
     // ===================== LIFECYCLE INIT =====================
 
@@ -134,7 +135,8 @@ public class WorkflowService {
                 sla.setWarningNotified(true);
                 slaRecordRepository.save(sla);
 
-                sendNotification("SYSTEM", sla.getCaseId(),
+                // Per spec: SLA early-warning escalates to Court Administrator (ADMIN role).
+                notifyAllByRole("ADMIN", sla.getCaseId(),
                         "SLA WARNING: Case #" + sla.getCaseId() + " Stage #" + sla.getStageId()
                         + " has consumed " + Math.round(usagePercent) + "% of SLA ("
                         + elapsed + "/" + sla.getSlaDays() + " days). Action needed soon!",
@@ -151,7 +153,8 @@ public class WorkflowService {
                 sla.setBreachNotified(true);
                 slaRecordRepository.save(sla);
 
-                sendNotification("SYSTEM", sla.getCaseId(),
+                // Per spec: SLA BREACHED → escalation notification to Court Administrator(s).
+                notifyAllByRole("ADMIN", sla.getCaseId(),
                         "SLA BREACHED: Case #" + sla.getCaseId() + " Stage #" + sla.getStageId()
                         + " exceeded SLA by " + (elapsed - sla.getSlaDays()) + " day(s).",
                         "COMPLIANCE");
@@ -421,6 +424,7 @@ public class WorkflowService {
     }
 
     private void sendNotification(String userId, Long caseId, String message, String category) {
+        if (userId == null || userId.isBlank()) return;
         try {
             Map<String, Object> req = new HashMap<>();
             req.put("userId",   userId);
@@ -430,6 +434,21 @@ public class WorkflowService {
             notificationClient.sendNotification(req);
         } catch (Exception e) {
             log.warn("Notification failed for Case {}: {}", caseId, e.getMessage());
+        }
+    }
+
+    /** Fan out a notification to every active user with the given role (e.g. ADMIN). */
+    private void notifyAllByRole(String role, Long caseId, String message, String category) {
+        try {
+            var recipients = iamClient.getUsersByRole(role);
+            if (recipients == null) return;
+            for (var u : recipients) {
+                if (u == null || u.getUserId() == null) continue;
+                if (u.getStatus() != null && !"ACTIVE".equalsIgnoreCase(u.getStatus())) continue;
+                sendNotification(u.getUserId(), caseId, message, category);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fan out notification to role {}: {}", role, e.getMessage());
         }
     }
 

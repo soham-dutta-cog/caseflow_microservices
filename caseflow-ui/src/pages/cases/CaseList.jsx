@@ -32,7 +32,14 @@ export default function CaseList() {
       } else {
         data = await cases.list()
       }
-      setList(data || [])
+      // Recent cases first — newest filed/created on top.
+      const sorted = (data || []).slice().sort((a, b) => {
+        const da = a.filedDate ? new Date(a.filedDate).getTime() : 0
+        const db = b.filedDate ? new Date(b.filedDate).getTime() : 0
+        if (db !== da) return db - da
+        return (b.caseId || 0) - (a.caseId || 0)  // tie-break by id desc
+      })
+      setList(sorted)
     } catch (e) { setErr(e.message) } finally { setLoading(false) }
   }
 

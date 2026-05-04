@@ -40,10 +40,13 @@ import MyReviews from './pages/appeals/MyReviews'
 import ReviewsByJudge from './pages/appeals/ReviewsByJudge'
 
 import ComplianceList from './pages/compliance/ComplianceList'
+import ComplianceRecordDetail from './pages/compliance/ComplianceRecordDetail'
+import ComplianceRunDetail from './pages/compliance/ComplianceRunDetail'
 import RunComplianceCheck from './pages/compliance/RunComplianceCheck'
 import AuditList from './pages/compliance/AuditList'
 
 import NotificationList from './pages/notifications/NotificationList'
+import CreateNotification from './pages/notifications/CreateNotification'
 
 import ReportList from './pages/reports/ReportList'
 
@@ -104,10 +107,13 @@ function App() {
             <Route path="/appeals/:appealId" element={<AppealDetail />} />
 
             <Route path="/compliance/check" element={<ProtectedRoute roles={['ADMIN','CLERK']}><RunComplianceCheck /></ProtectedRoute>} />
+            <Route path="/compliance/runs/:runId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><ComplianceRunDetail /></ProtectedRoute>} />
+            <Route path="/compliance/records/:complianceId" element={<ProtectedRoute roles={['ADMIN','CLERK']}><ComplianceRecordDetail /></ProtectedRoute>} />
             <Route path="/compliance" element={<ProtectedRoute roles={['ADMIN','CLERK']}><ComplianceList /></ProtectedRoute>} />
             <Route path="/audits" element={<ProtectedRoute roles={['ADMIN','CLERK']}><AuditList /></ProtectedRoute>} />
 
             <Route path="/notifications" element={<NotificationList />} />
+            <Route path="/notifications/create" element={<ProtectedRoute roles={['ADMIN','CLERK']}><CreateNotification /></ProtectedRoute>} />
 
             <Route path="/reports" element={<ProtectedRoute roles={['ADMIN','CLERK','LAWYER']}><ReportList /></ProtectedRoute>} />
 

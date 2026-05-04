@@ -22,4 +22,20 @@ public interface ComplianceService {
     AuditResponse getAuditById(Long auditId);
 
     List<AuditResponse> getAuditsByAdmin(String adminId);
+
+    void deleteComplianceRecord(Long complianceId);
+
+    void deleteAudit(Long auditId);
+
+    /** Bulk-delete compliance records by id. Returns count actually deleted. */
+    long deleteComplianceRecords(java.util.List<Long> complianceIds);
+
+    /** Bulk-delete audits by id. Returns count actually deleted. */
+    long deleteAudits(java.util.List<Long> auditIds);
+
+    /** Returns aggregated runs (one entry per compliance-check invocation). */
+    List<com.caseflow.compliance.dto.ComplianceRunSummary> getAllRuns();
+
+    /** Returns the per-case compliance records that make up a single run. */
+    List<ComplianceRecordResponse> getRunRecords(String runId);
 }
