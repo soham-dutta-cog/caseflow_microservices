@@ -31,10 +31,16 @@ public class FeignConfig {
                     (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (attrs == null) return;
             HttpServletRequest req = attrs.getRequest();
-            String userId   = req.getHeader("X-Auth-User-Id");
-            String userRole = req.getHeader("X-Auth-User-Role");
-            if (userId   != null && !userId.isBlank())   template.header("X-Auth-User-Id",   userId);
-            if (userRole != null && !userRole.isBlank()) template.header("X-Auth-User-Role", userRole);
+            String userId    = req.getHeader("X-Auth-User-Id");
+            String userRole  = req.getHeader("X-Auth-User-Role");
+            String userEmail = req.getHeader("X-Auth-User-Email");
+            String authHdr   = req.getHeader("Authorization");
+            if (userId    != null && !userId.isBlank())    template.header("X-Auth-User-Id",    userId);
+            if (userRole  != null && !userRole.isBlank())  template.header("X-Auth-User-Role",  userRole);
+            if (userEmail != null && !userEmail.isBlank()) template.header("X-Auth-User-Email", userEmail);
+            // Also forward the bearer JWT — needed when reporting-service hits
+            // any iam-service endpoint protected by Spring Security @PreAuthorize.
+            if (authHdr   != null && !authHdr.isBlank())   template.header("Authorization",     authHdr);
         };
     }
 }

@@ -3,6 +3,11 @@ spring:
     name: case-service
   config:
     import: optional:configserver:http://localhost:8888
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB        # must match FileStorageUtil.MAX_FILE_SIZE
+      max-request-size: 12MB     # a bit larger to allow form fields + the file
   cloud:
     openfeign:
       circuitbreaker:

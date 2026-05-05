@@ -40,7 +40,7 @@ public class CaseService {
         
         sendNotification(request.getLitigantId(), saved.getCaseId(),
             "Your case '" + saved.getTitle() + "' (Case #" + saved.getCaseId() + ") has been filed.", "CASE");
-        
+
         if (saved.getLawyerId() != null && !saved.getLawyerId().isBlank()) {
             log.info("Sending notification to lawyer: {}", saved.getLawyerId());
             sendNotification(saved.getLawyerId(), saved.getCaseId(),
@@ -48,6 +48,13 @@ public class CaseService {
         } else {
             log.warn("No lawyer assigned to case - lawyerId is null or blank");
         }
+
+        // Per spec: CASE FILED also notifies all CLERKS so they can pick up the case
+        // for verification and workflow initiation.
+        notifyAllByRole("CLERK", saved.getCaseId(),
+            "New case filed: '" + saved.getTitle() + "' (Case #" + saved.getCaseId() + "). Awaiting clerical review.",
+            "CASE");
+
         return mapToCaseResponse(saved);
     }
 
@@ -69,9 +76,15 @@ public class CaseService {
         documentRepository.save(saved);
 
 
+        // Per spec: DOCUMENT UPLOADED notifies CLERKS so they can verify it.
+        // We also send a confirmation to the uploader so they know it landed.
         sendNotification(request.getUploadedBy(), request.getCaseId(),
                 "Document '" + saved.getTitle() + "' uploaded for Case #" + request.getCaseId() + ". Pending verification.",
                 "CASE");
+        notifyAllByRole("CLERK", request.getCaseId(),
+                "Document '" + saved.getTitle() + "' uploaded for Case #" + request.getCaseId() + " — please verify.",
+                "CASE");
+
         return mapToDocumentResponse(saved);
     }
 
@@ -84,6 +97,7 @@ public class CaseService {
         document.setVerificationStatus(request.getStatus());
         document.setRejectionReason(request.getStatus() == Document.VerificationStatus.REJECTED
                 ? request.getRejectionReason() : null);
+        document.setVerifiedBy(request.getClerkId());
         Document saved = documentRepository.save(document);
 
         String action = request.getStatus() == Document.VerificationStatus.VERIFIED
@@ -135,9 +149,13 @@ public class CaseService {
                 if (existingCase.getLawyerId() != null) {
                     sendNotification(existingCase.getLawyerId(), caseId, msg, "CASE");
                 }
+                // Per spec: CASE ACTIVE also notifies CLERKS and JUDGES
+                // (the case is ready for hearing scheduling and judicial review).
+                notifyAllByRole("CLERK", caseId, msg, "CASE");
+                notifyAllByRole("JUDGE", caseId, msg, "CASE");
 
                 log.info("Case {} activated — advancing workflow", caseId);
-                workflowClient.advanceWorkflow(caseId);
+               // workflowClient.advanceWorkflow(caseId);
             }
         }
     }
@@ -191,20 +209,35 @@ public class CaseService {
     }
 
     private void sendNotification(String userId, Long caseId, String message, String category) {
+        if (userId == null || userId.isBlank()) return;
         try {
-            log.info("Preparing to send notification to userId: {}, caseId: {}, message: {}, category: {}", 
-                userId, caseId, message, category);
             Map<String, Object> req = new HashMap<>();
-            req.put("userId", userId); 
+            req.put("userId", userId);
             req.put("caseId", caseId);
-            req.put("message", message); 
+            req.put("message", message);
             req.put("category", category);
-            log.info("Sending notification payload: {}", req);
             notificationClient.sendNotification(req);
-            log.info("Notification sent successfully to userId: {}", userId);
-        } catch (Exception e) { 
-            log.warn("Notification failed for userId: {}, error: {}", userId, e.getMessage());
-            log.error("Notification exception details:", e);
+        } catch (Exception e) {
+            log.warn("Notification failed for userId {}: {}", userId, e.getMessage());
+        }
+    }
+
+    /**
+     * Fan out a notification to every active user with the given role.
+     * Used to alert all CLERKS / ADMINS on case lifecycle events
+     * (per the notification matrix in the system design doc).
+     */
+    private void notifyAllByRole(String role, Long caseId, String message, String category) {
+        try {
+            var recipients = iamClient.getUsersByRole(role);
+            if (recipients == null) return;
+            for (var u : recipients) {
+                if (u == null || u.getUserId() == null) continue;
+                if (u.getStatus() != null && !"ACTIVE".equalsIgnoreCase(u.getStatus())) continue;
+                sendNotification(u.getUserId(), caseId, message, category);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fan out notification to role {}: {}", role, e.getMessage());
         }
     }
 
@@ -224,7 +257,8 @@ public class CaseService {
         res.setTitle(d.getTitle()); res.setType(d.getType());
         res.setUri(d.getUri()); res.setUploadedDate(d.getUploadedDate());
         res.setVerificationStatus(d.getVerificationStatus());
-        res.setUploadedBy(d.getUploadedBy()); res.setRejectionReason(d.getRejectionReason());
+        res.setUploadedBy(d.getUploadedBy()); res.setVerifiedBy(d.getVerifiedBy());
+        res.setRejectionReason(d.getRejectionReason());
         res.setFileUrl(d.getFileUrl());
         res.setOriginalFileName(d.getOriginalFileName());
         res.setContentType(d.getContentType());

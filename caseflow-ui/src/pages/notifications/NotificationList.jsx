@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { notifications as notifApi } from '../../api/services'
-import { statusBadgeClass, formatDateTime, NOTIF_CATEGORY } from '../../utils/constants'
+import { statusBadgeClass, formatDateTime } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 
@@ -13,38 +13,42 @@ export default function NotificationList() {
   // Admin/clerk can look up another user's notifications by entering their ID
   const [lookupId, setLookupId] = useState('')
 
-  const [list, setList]           = useState([])
-  const [unreadOnly, setUnreadOnly] = useState(false)
-  const [err, setErr]             = useState('')
-  const [msg, setMsg]             = useState('')
-  const [loading, setLoading]     = useState(false)
-
-  // Manual create form — admin/clerk only
-  const [createForm, setCreateForm] = useState({ userId: '', caseId: '', message: '', category: 'CASE' })
+  const [list, setList]     = useState([])
+  // Default = UNREAD ONLY. User clicks "Show All" to see everything.
+  const [showAll, setShowAll] = useState(false)
+  const [err, setErr]       = useState('')
+  const [msg, setMsg]       = useState('')
+  const [loading, setLoading] = useState(false)
 
   const load = async () => {
     setLoading(true); setErr('')
     try {
       let data
       if (isPrivileged && lookupId.trim()) {
-        // Admin looking up a specific user
-        data = unreadOnly
-          ? await notifApi.unread(lookupId.trim())
-          : await notifApi.byUser(lookupId.trim())
+        data = showAll
+          ? await notifApi.byUser(lookupId.trim())
+          : await notifApi.unread(lookupId.trim())
       } else {
-        // Own notifications — works for ALL roles
-        data = unreadOnly
-          ? await notifApi.myUnread()
-          : await notifApi.my()
+        data = showAll
+          ? await notifApi.my()
+          : await notifApi.myUnread()
       }
-      setList(data || [])
+      setList(Array.isArray(data) ? data : [])
     } catch (e) { setErr(e.message) } finally { setLoading(false) }
   }
 
-  useEffect(() => { load() }, [unreadOnly, lookupId])
+  useEffect(() => { load() }, [showAll, lookupId])
 
   const markRead = async (id) => {
-    try { await notifApi.markRead(id); load() } catch (e) { setErr(e.message) }
+    try {
+      await notifApi.markRead(id)
+      // Optimistic local update so the bell icon and the list both feel instant.
+      if (showAll) {
+        setList(prev => prev.map(n => n.notificationId === id ? { ...n, status: 'READ' } : n))
+      } else {
+        setList(prev => prev.filter(n => n.notificationId !== id))
+      }
+    } catch (e) { setErr(e.message) }
   }
 
   const markAll = async () => {
@@ -60,40 +64,34 @@ export default function NotificationList() {
     } catch (e) { setErr(e.message) }
   }
 
-  const create = async (e) => {
-    e.preventDefault()
-    setErr(''); setMsg('')
-    try {
-      await notifApi.create({
-        userId:   createForm.userId.trim(),
-        caseId:   createForm.caseId ? Number(createForm.caseId) : null,
-        message:  createForm.message,
-        category: createForm.category,
-      })
-      setMsg('Notification created successfully.')
-      setCreateForm({ userId: '', caseId: '', message: '', category: 'CASE' })
-      load()
-    } catch (e) { setErr(e.message) }
-  }
-
   const unreadCount = list.filter(n => n.status === 'UNREAD').length
+  const inboxCount  = list.length
 
   return (
     <div>
+      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
+        <div className="d-flex align-items-center gap-2 flex-wrap">
           <h1 className="page-title h3 mb-0">{t('Notifications')}</h1>
           {unreadCount > 0 && (
-            <span className="badge text-bg-danger rounded-pill ms-2">{unreadCount} unread</span>
+            <span className="badge text-bg-danger rounded-pill">{unreadCount} unread</span>
           )}
         </div>
-        <button
-          className="btn btn-dark btn-sm"
-          onClick={markAll}
-          disabled={list.filter(n => n.status === 'UNREAD').length === 0}
-        >
-          <i className="bi bi-check2-all me-1" />Mark All Read
-        </button>
+        <div className="d-flex gap-2 flex-wrap">
+          <button
+            className="btn btn-outline-secondary btn-sm"
+            onClick={markAll}
+            disabled={unreadCount === 0}
+            title={unreadCount === 0 ? 'No unread notifications' : 'Mark every notification as read'}
+          >
+            <i className="bi bi-check2-all me-1" />Mark All Read
+          </button>
+          {isPrivileged && (
+            <Link to="/notifications/create" className="btn btn-primary btn-sm">
+              <i className="bi bi-plus-circle me-1" />Send Notification
+            </Link>
+          )}
+        </div>
       </div>
 
       {err && <div className="alert alert-danger py-2"><i className="bi bi-exclamation-triangle me-2" />{err}</div>}
@@ -103,30 +101,53 @@ export default function NotificationList() {
       <div className="card shadow-sm border-0 mb-3">
         <div className="card-body py-2">
           <div className="d-flex gap-3 align-items-center flex-wrap">
+            {/* Toggle: unread only ↔ all */}
+            <div className="btn-group btn-group-sm" role="group" aria-label="View filter">
+              <button
+                type="button"
+                className={`btn ${!showAll ? 'btn-dark' : 'btn-outline-secondary'}`}
+                onClick={() => setShowAll(false)}
+              >
+                <i className="bi bi-bell-fill me-1" />Unread
+                {!showAll && unreadCount > 0 && (
+                  <span className="badge bg-danger ms-2">{unreadCount}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`btn ${showAll ? 'btn-dark' : 'btn-outline-secondary'}`}
+                onClick={() => setShowAll(true)}
+              >
+                <i className="bi bi-archive me-1" />Show All
+                {showAll && <span className="badge bg-light text-dark ms-2">{inboxCount}</span>}
+              </button>
+            </div>
+
             {/* Admin-only: look up another user */}
             {isPrivileged && (
               <div className="d-flex align-items-center gap-2">
                 <label className="form-label fw-semibold small mb-0 text-nowrap">User ID:</label>
                 <input
                   className="form-control form-control-sm"
-                  style={{ width: 180 }}
-                  placeholder={`leave blank for your own`}
+                  style={{ width: 200 }}
+                  placeholder="leave blank for your own"
                   value={lookupId}
                   onChange={e => setLookupId(e.target.value)}
                 />
+                {lookupId.trim() && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => setLookupId('')}
+                    title="Clear and view your own notifications"
+                  >
+                    <i className="bi bi-x-lg" />
+                  </button>
+                )}
               </div>
             )}
-            <div className="form-check mb-0">
-              <input
-                id="unreadOnly"
-                className="form-check-input"
-                type="checkbox"
-                checked={unreadOnly}
-                onChange={e => setUnreadOnly(e.target.checked)}
-              />
-              <label htmlFor="unreadOnly" className="form-check-label small">Unread only</label>
-            </div>
-            <button className="btn btn-outline-secondary btn-sm" onClick={load}>
+
+            <button className="btn btn-outline-secondary btn-sm ms-auto" onClick={load}>
               <i className="bi bi-arrow-clockwise me-1" />{t('Refresh')}
             </button>
           </div>
@@ -140,8 +161,18 @@ export default function NotificationList() {
             <div className="text-center text-muted py-5">{t('Loading...')}</div>
           ) : list.length === 0 ? (
             <div className="text-center text-muted py-5">
-              <i className="bi bi-bell-slash display-4 d-block mb-3 opacity-25" />
-              <p className="mb-0">No notifications{unreadOnly ? ' (unread)' : ''} found.</p>
+              <i className={`bi ${showAll ? 'bi-inbox' : 'bi-bell-slash'} display-4 d-block mb-3 opacity-25`} />
+              <p className="mb-0 fw-semibold">
+                {showAll ? 'No notifications yet.' : 'You\'re all caught up!'}
+              </p>
+              <p className="text-muted small">
+                {showAll ? 'You\'ll see notifications here as they arrive.' : 'No unread notifications.'}
+              </p>
+              {!showAll && (
+                <button className="btn btn-outline-secondary btn-sm mt-2" onClick={() => setShowAll(true)}>
+                  <i className="bi bi-archive me-1" />Show All Notifications
+                </button>
+              )}
             </div>
           ) : (
             <div className="table-responsive">
@@ -176,7 +207,7 @@ export default function NotificationList() {
                           ? <Link to={`/cases/${n.caseId}`} className="fw-semibold">#{n.caseId}</Link>
                           : <span className="text-muted">—</span>}
                       </td>
-                      <td style={{ maxWidth: 340 }} className="small">{n.message}</td>
+                      <td style={{ maxWidth: 360 }} className="small">{n.message}</td>
                       <td>
                         <span className={`badge rounded-pill ${statusBadgeClass(n.status)}`}>
                           {n.status}
@@ -201,72 +232,6 @@ export default function NotificationList() {
           )}
         </div>
       </div>
-
-      {/* Manual create — admin/clerk only */}
-      {isPrivileged && (
-        <div className="card shadow-sm border-0">
-          <div className="card-header border-bottom" style={{ background: 'transparent' }}>
-            <h2 className="h6 mb-0 fw-semibold d-flex align-items-center gap-2">
-              <i className="bi bi-plus-circle text-primary" />
-              Send Notification
-              <span className="text-muted fw-normal small">(manual — admin / clerk)</span>
-            </h2>
-          </div>
-          <div className="card-body">
-            <form onSubmit={create}>
-              <div className="row g-3">
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold small">Recipient User ID <span className="text-danger">*</span></label>
-                  <input
-                    className="form-control"
-                    placeholder="e.g. user@example.com"
-                    value={createForm.userId}
-                    onChange={e => setCreateForm({ ...createForm, userId: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold small">Case ID <span className="text-muted fw-normal">(optional)</span></label>
-                  <input
-                    className="form-control"
-                    type="number"
-                    placeholder="Case ID"
-                    value={createForm.caseId}
-                    onChange={e => setCreateForm({ ...createForm, caseId: e.target.value })}
-                  />
-                </div>
-                <div className="col-md-4">
-                  <label className="form-label fw-semibold small">Category</label>
-                  <select
-                    className="form-select"
-                    value={createForm.category}
-                    onChange={e => setCreateForm({ ...createForm, category: e.target.value })}
-                  >
-                    {(NOTIF_CATEGORY || ['CASE', 'HEARING', 'APPEAL', 'COMPLIANCE']).map(c => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-12">
-                  <label className="form-label fw-semibold small">Message <span className="text-danger">*</span></label>
-                  <textarea
-                    className="form-control"
-                    rows={2}
-                    value={createForm.message}
-                    onChange={e => setCreateForm({ ...createForm, message: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="mt-3">
-                <button className="btn btn-dark d-flex align-items-center gap-2">
-                  <i className="bi bi-send" />Send Notification
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

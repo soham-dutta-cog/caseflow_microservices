@@ -4,6 +4,7 @@ import com.caseflow.compliance.dto.AuditRequest;
 import com.caseflow.compliance.dto.AuditResponse;
 import com.caseflow.compliance.dto.ComplianceCheckRequest;
 import com.caseflow.compliance.dto.ComplianceRecordResponse;
+import com.caseflow.compliance.dto.ComplianceRunSummary;
 import com.caseflow.compliance.security.RoleGuard;
 import com.caseflow.compliance.service.ComplianceService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -125,5 +127,75 @@ public class ComplianceController {
             @PathVariable String adminId) {
         roleGuard.requireAnyRole(userRole, "ADMIN", "CLERK");
         return ResponseEntity.ok(complianceService.getAuditsByAdmin(adminId));
+    }
+
+    @DeleteMapping("/api/compliance/{complianceId}")
+    @Operation(summary = "Delete a compliance record", description = "Permanently removes a compliance record. Roles: ADMIN.")
+    public ResponseEntity<Void> deleteComplianceRecord(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @PathVariable Long complianceId) {
+        roleGuard.requireAnyRole(userRole, "ADMIN");
+        complianceService.deleteComplianceRecord(complianceId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/api/audits/{id}")
+    @Operation(summary = "Delete an audit record", description = "Permanently removes an audit. Roles: ADMIN.")
+    public ResponseEntity<Void> deleteAudit(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @PathVariable Long id) {
+        roleGuard.requireAnyRole(userRole, "ADMIN");
+        complianceService.deleteAudit(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/compliance/runs")
+    @Operation(summary = "List compliance check runs",
+        description = "One entry per Run-Compliance-Check invocation. Records that pre-date run tracking are aggregated by date.")
+    public ResponseEntity<List<ComplianceRunSummary>> listRuns(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole) {
+        roleGuard.requireAnyRole(userRole, "ADMIN", "CLERK");
+        return ResponseEntity.ok(complianceService.getAllRuns());
+    }
+
+    /* ── Bulk delete: by id list ─────────────────────────────────────────── */
+
+    @PostMapping("/api/compliance/bulk-delete")
+    @Operation(summary = "Bulk-delete compliance records by id",
+        description = "Body: { ids: [1,2,3] }. Returns { deleted: N }. Roles: ADMIN.")
+    public ResponseEntity<java.util.Map<String, Object>> bulkDeleteComplianceRecords(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @RequestBody java.util.Map<String, java.util.List<Long>> body) {
+        roleGuard.requireAnyRole(userRole, "ADMIN");
+        long deleted = complianceService.deleteComplianceRecords(
+                body == null ? java.util.List.of() : body.getOrDefault("ids", java.util.List.of()));
+        return ResponseEntity.ok(java.util.Map.of("deleted", deleted));
+    }
+
+    @PostMapping("/api/audits/bulk-delete")
+    @Operation(summary = "Bulk-delete audits by id",
+        description = "Body: { ids: [1,2,3] }. Returns { deleted: N }. Roles: ADMIN.")
+    public ResponseEntity<java.util.Map<String, Object>> bulkDeleteAudits(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @RequestBody java.util.Map<String, java.util.List<Long>> body) {
+        roleGuard.requireAnyRole(userRole, "ADMIN");
+        long deleted = complianceService.deleteAudits(
+                body == null ? java.util.List.of() : body.getOrDefault("ids", java.util.List.of()));
+        return ResponseEntity.ok(java.util.Map.of("deleted", deleted));
+    }
+
+    @GetMapping("/api/compliance/runs/{runId}")
+    @Operation(summary = "Get the per-case records of a single compliance run")
+    public ResponseEntity<List<ComplianceRecordResponse>> getRunRecords(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @PathVariable String runId) {
+        roleGuard.requireAnyRole(userRole, "ADMIN", "CLERK");
+        return ResponseEntity.ok(complianceService.getRunRecords(runId));
     }
 }

@@ -108,6 +108,13 @@ export const compliance = {
   runCheck: (data) => api.post('/api/compliance/check', data),
   byCase: (caseId) => api.get(`/api/compliance/case/${caseId}`),
   complianceRecordsPaginated: (page = 0, size = 10) => api.get('/api/compliance/paginated', { page, size }),
+  deleteRecord: (id) => api.del(`/api/compliance/${id}`),
+  // Compliance check runs — server-side aggregation
+  runs: () => api.get('/api/compliance/runs'),
+  runRecords: (runId) => api.get(`/api/compliance/runs/${encodeURIComponent(runId)}`),
+  // Bulk delete by id list (ADMIN only) — body: { ids: [1,2,3] }
+  bulkDeleteRecords: (ids) => api.post('/api/compliance/bulk-delete', { ids }),
+  bulkDeleteAudits:  (ids) => api.post('/api/audits/bulk-delete', { ids }),
   // Audits
   createAudit: (data) => api.post('/api/audits', data),
   getAudit: (id) => api.get(`/api/audits/${id}`),
@@ -115,6 +122,7 @@ export const compliance = {
   closeAudit: (id) => api.patch(`/api/audits/${id}/close`),   // adminId comes from JWT header
   auditsByAdmin: (adminId) => api.get(`/api/audits/admin/${adminId}`),
   auditsPaginated: (page = 0, size = 10) => api.get('/api/audits/paginated', { page, size }),
+  deleteAudit: (id) => api.del(`/api/audits/${id}`),
 }
 
 export const notifications = {
@@ -147,4 +155,5 @@ export const reports = {
   byClerk: (clerkId) => api.get(`/api/reports/clerk/${clerkId}`),
   byLawyer: (lawyerId) => api.get(`/api/reports/lawyer/${lawyerId}`),
   paginated: (page = 0, size = 10, sort = 'reportId,desc') => api.get('/api/reports/paginated', { page, size, sort }),
+  del: (id) => api.del(`/api/reports/${id}`),
 }

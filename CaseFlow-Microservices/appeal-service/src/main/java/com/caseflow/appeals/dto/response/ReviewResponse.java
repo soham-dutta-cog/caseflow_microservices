@@ -16,6 +16,8 @@ public class ReviewResponse {
     private Long          caseId;
     private Long          appealId;
     private String        judgeId;
+    /** User-id of the clerk/admin who opened this review and assigned the judge. */
+    private String        assignedByClerkId;
     private LocalDateTime reviewDate;
     private ReviewOutcome outcome;
     private String        remarks;

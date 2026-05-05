@@ -14,6 +14,7 @@ public class CaseDto {
     private String caseType;        // civil, criminal, corporate
     private String litigantId;
     private String lawyerId;
-    private Long judgeId;
+    /** Judge user-id (IAM format, e.g. "JOH_JUDGE_1"). */
+    private String judgeId;
     private LocalDate filedDate;
 }

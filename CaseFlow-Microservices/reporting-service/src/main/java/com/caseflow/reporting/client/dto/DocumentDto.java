@@ -14,5 +14,7 @@ public class DocumentDto {
     private String type;                  // PETITION, EVIDENCE, etc.
     private String verificationStatus;    // PENDING, VERIFIED, REJECTED
     private String uploadedBy;
+    /** User-id of the clerk who verified or rejected this document. */
+    private String verifiedBy;
     private LocalDateTime uploadedAt;
 }

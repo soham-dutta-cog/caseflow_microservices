@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cases, users, auth as authApi } from '../../api/services'
 import { useAuth } from '../../context/AuthContext'
+import {
+  UPLOAD_ALLOWED_EXTENSIONS, UPLOAD_ACCEPT_ATTR, validateUpload, formatBytes,
+} from '../../utils/constants'
 
 export default function FileCase() {
   const { user, setUser } = useAuth()
@@ -61,6 +64,18 @@ export default function FileCase() {
   const submit = async (e) => {
     e.preventDefault()
     setErr('')
+
+    // Validate every selected file before contacting the backend
+    if (!withLawyer && docs.length > 0) {
+      for (const f of docs) {
+        const v = validateUpload(f)
+        if (v) {
+          const m = `${f.name}: ${v}`
+          setErr(m); window.alert(m); return
+        }
+      }
+    }
+
     setLoading(true)
     try {
       const res = await cases.file({
@@ -75,11 +90,18 @@ export default function FileCase() {
           fd.append('file', file)
           fd.append('caseId', caseId)
           fd.append('uploadedBy', form.litigantId)
+          fd.append('title', file.name)
+          fd.append('type',  'PETITION')
           await cases.uploadDoc(fd)
         }
       }
       nav(`/cases/${caseId}`)
-    } catch (e) { setErr(e.message) } finally { setLoading(false) }
+    } catch (e) {
+      const m = e?.message || 'Could not file the case.'
+      setErr(m); window.alert(m)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -181,20 +203,70 @@ export default function FileCase() {
               </div>
             )}
 
+            {/* Document submission deadline notice — driven by the SLA stage for intake/filing */}
+            <div className="alert alert-warning py-2 small mb-3 d-flex align-items-start gap-2" style={{ background: '#fffbeb', borderColor: '#fde68a' }}>
+              <i className="bi bi-clock-history mt-1" style={{ color: '#b45309', flexShrink: 0 }} />
+              <div>
+                <strong style={{ color: '#92400e' }}>Document submission deadline</strong> &mdash; once the case is filed, the workflow lifecycle will start the
+                <strong> Intake / Filing SLA stage</strong>. All required documents must be submitted and verified before that stage's SLA deadline.
+                You can view the exact deadline on the case detail page after filing, under <em>SLA Stages</em>. Missing the deadline marks the stage as BREACHED.
+              </div>
+            </div>
+
             {/* Document upload — only when no lawyer */}
             {!withLawyer && (
               <div className="mb-3">
                 <label className="form-label fw-semibold small">
                   Upload Documents <span className="text-muted fw-normal">(optional)</span>
                 </label>
+
+                {/* Constraint banner */}
+                <div className="alert alert-info py-2 small mb-2 d-flex align-items-start gap-2">
+                  <i className="bi bi-info-circle-fill mt-1" style={{ flexShrink: 0 }} />
+                  <div>
+                    Max <strong>10 MB</strong> per file.{' '}
+                    Allowed types: <strong>{UPLOAD_ALLOWED_EXTENSIONS.join(', ')}</strong>.
+                  </div>
+                </div>
+
                 <input
                   className="form-control"
                   type="file"
                   multiple
-                  onChange={e => setDocs(Array.from(e.target.files))}
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  accept={UPLOAD_ACCEPT_ATTR}
+                  onChange={e => {
+                    const files = Array.from(e.target.files || [])
+                    // pre-validate each file; reject the whole batch if any file is invalid
+                    for (const f of files) {
+                      const v = validateUpload(f)
+                      if (v) {
+                        window.alert(`${f.name}: ${v}`)
+                        setErr(`${f.name}: ${v}`)
+                        e.target.value = ''
+                        setDocs([])
+                        return
+                      }
+                    }
+                    setErr('')
+                    setDocs(files)
+                  }}
                 />
-                <div className="form-text text-muted">Accepted: PDF, Word, images. You can also upload more documents from the case page.</div>
+                <div className="form-text text-muted">
+                  You can also upload more documents from the case page after filing.
+                </div>
+
+                {docs.length > 0 && (
+                  <div className="mt-2">
+                    <div className="text-muted small">{docs.length} file{docs.length !== 1 ? 's' : ''} selected:</div>
+                    <ul className="small mb-0 ps-3">
+                      {docs.map((f, i) => (
+                        <li key={i}>
+                          {f.name} <span className="text-muted">({formatBytes(f.size)})</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
 

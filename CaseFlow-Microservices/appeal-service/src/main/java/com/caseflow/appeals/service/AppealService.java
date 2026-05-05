@@ -48,6 +48,7 @@ public class AppealService {
     private final CaseServiceClient         caseClient;
     private final ApplicationEventPublisher events;
     private final AppealAuditService        audit;
+    private final com.caseflow.appeals.client.IamServiceClient iamClient;
 
     /** Filing deadline (days after case CLOSED). 0 or negative disables the check. */
     @Value("${appeal.filing-deadline-days:90}")
@@ -127,11 +128,16 @@ public class AppealService {
             null, AppealStatus.SUBMITTED,
             "caseId=" + appeal.getCaseId());
 
+        // Per spec: APPEAL FILED → notify Judge, Clerk (and we also keep the filer/litigant/lawyer
+        // informed so the case parties know it landed). Since no judge is assigned at filing time,
+        // the "Judge" recipient is satisfied later when the review is opened (UNDER_REVIEW event).
+        java.util.Set<String> filedRecipients = new java.util.LinkedHashSet<>(stakeholders(currentUserId, caseInfo, null));
+        filedRecipients.addAll(usersWithRole("CLERK"));
         events.publishEvent(new AppealEvent(
             AppealEvent.Type.FILED,
             appeal.getAppealId(),
             appeal.getCaseId(),
-            stakeholders(currentUserId, caseInfo, null),
+            filedRecipients,
             "Appeal #" + appeal.getAppealId() + " has been filed for case #" + appeal.getCaseId() + "."
         ));
 
@@ -260,6 +266,24 @@ public class AppealService {
         }
         addIfPresent(ids, judgeId);
         return ids;
+    }
+
+    /** Resolve every active user with the given role from iam-service. */
+    Set<String> usersWithRole(String role) {
+        try {
+            var users = iamClient.getUsersByRole(role);
+            if (users == null) return Set.of();
+            Set<String> out = new LinkedHashSet<>();
+            for (var u : users) {
+                if (u == null || u.getUserId() == null) continue;
+                if (u.getStatus() != null && !"ACTIVE".equalsIgnoreCase(u.getStatus())) continue;
+                out.add(u.getUserId());
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("Could not resolve users with role {} for notification fan-out: {}", role, e.getMessage());
+            return Set.of();
+        }
     }
 
     private static void addIfPresent(Set<String> ids, String id) {

@@ -129,6 +129,15 @@ public class ReportServiceImpl implements ReportService {
                 .stream().map(this::toResponse).toList();
     }
 
+    @Override
+    public void deleteReport(Long reportId) {
+        if (!reportRepository.existsById(reportId)) {
+            throw new ResourceNotFoundException("Report not found: #" + reportId);
+        }
+        reportRepository.deleteById(reportId);
+        log.info("Deleted report #{}", reportId);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Aggregation
     // ─────────────────────────────────────────────────────────────────────────
@@ -174,11 +183,17 @@ public class ReportServiceImpl implements ReportService {
                     .filter(h -> withinRange(h.getHearingDate(), dateFrom, dateTo))
                     .toList();
             // Extra safety filter for JUDGE scope — hearings must belong to that judge too
-            if (scope == ReportScope.JUDGE) {
-                Long judgeId = parseLongOrNull(scopeValue);
-                if (judgeId != null) {
-                    hearings = hearings.stream().filter(h -> judgeId.equals(h.getJudgeId())).toList();
-                }
+            if (scope == ReportScope.JUDGE && scopeValue != null && !scopeValue.isBlank()
+                    && !"ALL".equalsIgnoreCase(scopeValue)) {
+                hearings = hearings.stream().filter(h -> scopeValue.equals(h.getJudgeId())).toList();
+            }
+            // CLERK scope — keep only hearings scheduled by this clerk
+            // (scopeValue is the clerk's user-id, stored as String in Hearing.scheduledBy)
+            if (scope == ReportScope.CLERK && scopeValue != null && !scopeValue.isBlank()
+                    && !"ALL".equalsIgnoreCase(scopeValue)) {
+                hearings = hearings.stream()
+                        .filter(h -> scopeValue.equals(h.getScheduledBy()))
+                        .toList();
             }
         }
 
@@ -190,6 +205,13 @@ public class ReportServiceImpl implements ReportService {
             } catch (Exception e) {
                 log.warn("Skipping documents for case #{}: {}", caseId, e.getMessage());
             }
+        }
+        // CLERK scope — keep only documents this clerk verified/rejected
+        if (scope == ReportScope.CLERK && scopeValue != null && !scopeValue.isBlank()
+                && !"ALL".equalsIgnoreCase(scopeValue)) {
+            documents = documents.stream()
+                    .filter(d -> scopeValue.equals(d.getVerifiedBy()))
+                    .toList();
         }
 
         // ── 5. SLA records ──────────────────────────────────────────────────
@@ -210,7 +232,13 @@ public class ReportServiceImpl implements ReportService {
 
         // ── 6. Appeals ──────────────────────────────────────────────────────
         List<AppealDto> appeals;
-        if (narrowing && caseIds.isEmpty()) {
+        if (scope == ReportScope.LAWYER && scopeValue != null && !scopeValue.isBlank()
+                && !"ALL".equalsIgnoreCase(scopeValue)) {
+            // For LAWYER scope, fetch all appeals filed by this user directly. This
+            // covers appeals on cases the lawyer represents AND appeals on cases
+            // they don't (in case the case-by-lawyer mapping uses a different id format).
+            appeals = safeList(() -> appealClient.getAppealsByUser(scopeValue));
+        } else if (narrowing && caseIds.isEmpty()) {
             appeals = List.of();
         } else if (caseIds.isEmpty()) {
             // System-wide scope: pull a large page
@@ -232,11 +260,9 @@ public class ReportServiceImpl implements ReportService {
 
         // ── 7. Reviews ──────────────────────────────────────────────────────
         List<ReviewDto> reviews = new ArrayList<>();
-        if (scope == ReportScope.JUDGE) {
-            Long judgeId = parseLongOrNull(scopeValue);
-            if (judgeId != null) {
-                reviews.addAll(safeList(() -> appealClient.getReviewsByJudge(judgeId)));
-            }
+        if (scope == ReportScope.JUDGE && scopeValue != null && !scopeValue.isBlank()
+                && !"ALL".equalsIgnoreCase(scopeValue)) {
+            reviews.addAll(safeList(() -> appealClient.getReviewsByJudge(scopeValue)));
         } else if (!caseIds.isEmpty()) {
             for (Long caseId : caseIds) {
                 try {
@@ -247,6 +273,23 @@ public class ReportServiceImpl implements ReportService {
             }
         }
         // narrowing scopes with empty caseIds → reviews stays empty (correct)
+
+        // CLERK scope — keep only reviews this clerk opened (assigned the judge)
+        if (scope == ReportScope.CLERK && scopeValue != null && !scopeValue.isBlank()
+                && !"ALL".equalsIgnoreCase(scopeValue)) {
+            reviews = reviews.stream()
+                    .filter(r -> scopeValue.equals(r.getAssignedByClerkId()))
+                    .toList();
+            // For CLERK scope, also restrict appeals to those that have a clerk-routed review
+            // (so "Appeals Routed by this clerk" stat is honest).
+            java.util.Set<Long> clerkRoutedAppealIds = new java.util.HashSet<>();
+            for (ReviewDto rv : reviews) {
+                if (rv.getAppealId() != null) clerkRoutedAppealIds.add(rv.getAppealId());
+            }
+            appeals = appeals.stream()
+                    .filter(a -> clerkRoutedAppealIds.contains(a.getAppealId()))
+                    .toList();
+        }
 
         // ── 8. Compliance records ───────────────────────────────────────────
         List<ComplianceRecordDto> compliance;
@@ -278,11 +321,23 @@ public class ReportServiceImpl implements ReportService {
                     return c == null ? List.of() : List.of(c);
                 }
                 case JUDGE: {
-                    // case-service has no "by judge" endpoint, so we filter all cases by judgeId
-                    Long judgeId = parseLongOrNull(scopeValue);
-                    List<CaseDto> all = caseClient.getAllCases();
-                    if (judgeId == null) return all;
-                    return all.stream().filter(c -> judgeId.equals(c.getJudgeId())).toList();
+                    // The Case entity does NOT carry a judgeId field — judges are linked to
+                    // cases only through hearings. So a judge's caseload = the distinct cases
+                    // for which they have at least one hearing assignment.
+                    if (scopeValue == null || scopeValue.isBlank() || "ALL".equalsIgnoreCase(scopeValue)) {
+                        return caseClient.getAllCases();
+                    }
+                    List<HearingDto> allHearings = safeList(hearingClient::getAllHearings);
+                    java.util.Set<Long> judgeCaseIds = new java.util.HashSet<>();
+                    for (HearingDto h : allHearings) {
+                        if (scopeValue.equals(h.getJudgeId()) && h.getCaseId() != null) {
+                            judgeCaseIds.add(h.getCaseId());
+                        }
+                    }
+                    if (judgeCaseIds.isEmpty()) return List.of();
+                    return caseClient.getAllCases().stream()
+                            .filter(c -> judgeCaseIds.contains(c.getCaseId()))
+                            .toList();
                 }
                 case CLERK: {
                     // No direct "by clerk" — return all cases (clerk works system-wide)
@@ -348,6 +403,26 @@ public class ReportServiceImpl implements ReportService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .count();
+
+        // For JUDGE / CLERK scopes, the appeals metrics should reflect the user's review
+        // activity (appeals routed TO a judge / routed BY a clerk). We rebuild the counts
+        // from the reviews list which is already filtered by judgeId / assignedByClerkId.
+        if ((scope == ReportScope.JUDGE || scope == ReportScope.CLERK) && !reviews.isEmpty()) {
+            int reviewsAssigned  = reviews.size();
+            int reviewsCompleted = (int) reviews.stream()
+                    .filter(r -> r.getOutcome() != null && !r.getOutcome().isBlank())
+                    .count();
+            int reviewsPending   = reviewsAssigned - reviewsCompleted;
+            totalAppeals       = reviewsAssigned;
+            appealsFiled       = reviewsAssigned;     // appeals routed (to/by this user)
+            appealsUnderReview = reviewsPending;      // still in process
+            appealsDecided     = reviewsCompleted;    // review completed
+            casesWithAppeals   = (int) reviews.stream()
+                    .map(ReviewDto::getCaseId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .count();
+        }
 
         // Review outcomes
         int upheld     = (int) reviews.stream().filter(r -> equalsAny(r.getOutcome(), "UPHELD", "APPEAL_UPHELD")).count();

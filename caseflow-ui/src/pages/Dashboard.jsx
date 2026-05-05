@@ -35,7 +35,16 @@ export default function Dashboard() {
           appeals: a.status === 'fulfilled' ? (a.value?.totalElements || a.value?.content?.length || 0) : 0,
           breached: sla.status === 'fulfilled' ? (sla.value?.length || 0) : 0,
         })
-        if (c.status === 'fulfilled') setRecentCases((c.value || []).slice(0, 5))
+        if (c.status === 'fulfilled') {
+          // Recent cases first (by filedDate desc, then caseId desc)
+          const sorted = (c.value || []).slice().sort((x, y) => {
+            const dx = x.filedDate ? new Date(x.filedDate).getTime() : 0
+            const dy = y.filedDate ? new Date(y.filedDate).getTime() : 0
+            if (dy !== dx) return dy - dx
+            return (y.caseId || 0) - (x.caseId || 0)
+          })
+          setRecentCases(sorted.slice(0, 5))
+        }
       } catch (e) { setErr(e.message) }
     }
     load()

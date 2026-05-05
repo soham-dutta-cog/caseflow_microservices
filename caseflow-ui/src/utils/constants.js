@@ -5,6 +5,39 @@ export const CASE_STATUS = ['FILED', 'ACTIVE', 'ADJOURNED', 'CLOSED']
 export const DOC_TYPES = ['PETITION', 'AFFIDAVIT', 'EVIDENCE', 'ORDER', 'JUDGMENT', 'OTHER']
 export const DOC_VERIFICATION = ['PENDING', 'VERIFIED', 'REJECTED']
 
+// Mirrors case-service FileStorageUtil. Update both if backend limits change.
+export const UPLOAD_MAX_BYTES = 10 * 1024 * 1024  // 10 MB
+export const UPLOAD_ALLOWED_EXTENSIONS = [
+  'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+  'txt', 'jpg', 'jpeg', 'png', 'gif', 'zip', 'rar',
+]
+export const UPLOAD_ACCEPT_ATTR = UPLOAD_ALLOWED_EXTENSIONS.map(e => '.' + e).join(',')
+
+/** Validate a File object. Returns null if valid, or a human-readable error string. */
+export function validateUpload(file) {
+  if (!file) return 'Please choose a file.'
+  if (file.size === 0) return 'The selected file is empty.'
+  if (file.size > UPLOAD_MAX_BYTES) {
+    const mb = (file.size / (1024 * 1024)).toFixed(2)
+    return `File is too large (${mb} MB). Max allowed is 10 MB.`
+  }
+  const name = file.name || ''
+  const dot  = name.lastIndexOf('.')
+  if (dot < 0) return 'File has no extension. Allowed types: ' + UPLOAD_ALLOWED_EXTENSIONS.join(', ')
+  const ext  = name.slice(dot + 1).toLowerCase()
+  if (!UPLOAD_ALLOWED_EXTENSIONS.includes(ext)) {
+    return `File type ".${ext}" is not allowed. Allowed types: ${UPLOAD_ALLOWED_EXTENSIONS.join(', ')}`
+  }
+  return null
+}
+
+export function formatBytes(n) {
+  if (n == null) return '—'
+  if (n < 1024) return n + ' B'
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB'
+  return (n / (1024 * 1024)).toFixed(2) + ' MB'
+}
+
 export const HEARING_STATUS = ['SCHEDULED', 'RESCHEDULED', 'COMPLETED', 'CANCELLED']
 
 // ── Appeals (must match backend enums in entity/Appeal.java + entity/Review.java) ──

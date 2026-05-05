@@ -13,6 +13,8 @@ public class DocumentResponse {
     private LocalDateTime uploadedDate;
     private Document.VerificationStatus verificationStatus;
     private String uploadedBy;
+    /** User-id of the clerk who verified or rejected this document. */
+    private String verifiedBy;
     private String rejectionReason;
 
     private String fileUrl;

@@ -67,7 +67,7 @@ export default function UserList() {
                 <label className="form-label fw-semibold small">{t('Password')}</label>
                 <div className="input-group">
                   <input
-                    className="form-control"
+                    className="form-control no-native-reveal"
                     type={showPass ? 'text' : 'password'}
                     minLength={6}
                     value={form.password}
@@ -76,6 +76,13 @@ export default function UserList() {
                     required
                     style={{ boxShadow: 'none' }}
                   />
+                  {/* Hide the browser-native password reveal eye on Edge/IE/Chromium so the
+                      custom show/hide button below is the only one visible. */}
+                  <style>{`
+                    .no-native-reveal::-ms-reveal,
+                    .no-native-reveal::-ms-clear { display: none; }
+                    .no-native-reveal::-webkit-credentials-auto-fill-button { display: none !important; }
+                  `}</style>
                   <button type="button" className="btn btn-outline-secondary" onClick={() => setShowPass(v => !v)} title="Show/hide">
                     <i className={`bi ${showPass ? 'bi-eye-slash' : 'bi-eye'}`} />
                   </button>

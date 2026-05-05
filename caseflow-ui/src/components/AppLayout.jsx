@@ -59,7 +59,7 @@ const NAV_GROUPS = [
 export default function AppLayout() {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
-  const { language, setLanguage, t } = useLanguage()
+  const { language, setLanguage, t, supportedLanguages } = useLanguage()
   const navigate = useNavigate()
   const location = useLocation()
   const [unread, setUnread] = useState(0)
@@ -73,14 +73,74 @@ export default function AppLayout() {
     async function fetchUnread() {
       if (!user) return
       try {
-        const res = await notifApi.count(user.email)
-        if (active) setUnread(res?.unreadCount || 0)
+        // Prefer the JWT-based "my" endpoint so it works regardless of whether the
+        // user-id stored on the notification is an email or an IAM userId.
+        let res
+        try {
+          res = await notifApi.myCount()
+        } catch {
+          res = await notifApi.count(user.userId || user.email)
+        }
+        const n = res?.unreadCount ?? res?.count ?? (Array.isArray(res) ? res.length : 0)
+        if (active) setUnread(Number(n) || 0)
       } catch { /* ignore */ }
     }
     fetchUnread()
-    const t = setInterval(fetchUnread, 30000)
-    return () => { active = false; clearInterval(t) }
+    // Poll every 5s while the tab is visible so the bell feels instant.
+    // When the tab is hidden we slow to 60s to avoid burning quota / API hits.
+    let interval = 5000
+    let tick = setInterval(fetchUnread, interval)
+    const reschedule = (newInterval) => {
+      if (newInterval === interval) return
+      clearInterval(tick)
+      interval = newInterval
+      tick = setInterval(fetchUnread, interval)
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchUnread()         // immediate refresh on tab return
+        reschedule(5000)
+      } else {
+        reschedule(60000)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
+    // Cross-tab signal: any other tab can dispatch this event after performing
+    // an action that creates a notification (e.g. file case, schedule hearing).
+    // window.dispatchEvent(new Event('cf:notify-bump'))
+    const onBump = () => fetchUnread()
+    window.addEventListener('cf:notify-bump', onBump)
+
+    // Also refresh on browser focus (covers the OS-level "tab clicked" case
+    // where visibilitychange might not fire).
+    window.addEventListener('focus', onBump)
+
+    // Refresh when navigating to a different page in the SPA.
+    return () => {
+      active = false
+      clearInterval(tick)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('cf:notify-bump', onBump)
+      window.removeEventListener('focus', onBump)
+    }
   }, [user])
+
+  // When the user navigates between pages, refresh the badge once — covers
+  // the common case of "perform an action -> get redirected -> bell should reflect it".
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        let res
+        try { res = await notifApi.myCount() } catch { res = await notifApi.count(user.userId || user.email) }
+        const n = res?.unreadCount ?? res?.count ?? (Array.isArray(res) ? res.length : 0)
+        if (!cancelled) setUnread(Number(n) || 0)
+      } catch { /* ignore */ }
+    })()
+    return () => { cancelled = true }
+  }, [location.pathname, user])
 
   useEffect(() => { setDrawerOpen(false); setProfileOpen(false) }, [location])
 
@@ -144,9 +204,30 @@ export default function AppLayout() {
         </nav>
 
         <div className="app-topbar__right">
-          <NavLink to="/notifications" className="app-topbar__icon-btn">
-            <i className="bi bi-bell" />
-            {unread > 0 && <span className="app-topbar__notif-badge">{unread}</span>}
+          <NavLink
+            to="/notifications"
+            className="app-topbar__icon-btn"
+            title={unread > 0 ? `${unread} unread notification${unread !== 1 ? 's' : ''}` : 'Notifications'}
+            style={{ position: 'relative' }}
+          >
+            {/* Animated bell when there are unread items so the user notices */}
+            <i className={`bi ${unread > 0 ? 'bi-bell-fill' : 'bi-bell'}`}
+               style={unread > 0 ? { color: '#dc3545' } : {}} />
+            {unread > 0 && (
+              <span
+                className="app-topbar__notif-badge"
+                style={{
+                  position: 'absolute', top: -4, right: -4,
+                  background: '#dc3545', color: '#fff',
+                  borderRadius: 999, minWidth: 18, height: 18,
+                  fontSize: 10, fontWeight: 700, lineHeight: '18px',
+                  textAlign: 'center', padding: '0 5px',
+                  boxShadow: '0 0 0 2px #fff', display: 'inline-block'
+                }}
+              >
+                {unread > 99 ? '99+' : unread}
+              </span>
+            )}
           </NavLink>
 
           <div className="app-topbar__profile" ref={profileRef}>
@@ -197,13 +278,9 @@ export default function AppLayout() {
                         value={language}
                         onChange={e => setLanguage(e.target.value)}
                       >
-                        <option value="english">English</option>
-                        <option value="hindi">हिंदी</option>
-                        <option value="bengali">বাংলা</option>
-                        <option value="tamil">தமிழ்</option>
-                        <option value="telugu">తెలుగు</option>
-                        <option value="marathi">मराठी</option>
-                        <option value="kannada">ಕನ್ನಡ</option>
+                        {(supportedLanguages || []).map(l => (
+                          <option key={l.id} value={l.id}>{l.label}</option>
+                        ))}
                       </select>
                     </div>
                   </div>
