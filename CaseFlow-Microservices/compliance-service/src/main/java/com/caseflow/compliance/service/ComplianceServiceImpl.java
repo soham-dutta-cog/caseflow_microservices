@@ -47,6 +47,7 @@ public class ComplianceServiceImpl implements ComplianceService {
     private final CaseServiceClient caseServiceClient;
     private final WorkflowServiceClient workflowServiceClient;
     private final NotificationServiceClient notificationServiceClient;
+    private final com.caseflow.compliance.client.IamServiceClient iamServiceClient;
     private final RoleGuard roleGuard;
 
     @Override
@@ -66,6 +67,12 @@ public class ComplianceServiceImpl implements ComplianceService {
             log.warn("Compliance check by admin {} found no cases to process — case-service may be unavailable", userId);
             return List.of();
         }
+
+        // One UUID and one timestamp per run. Every record created in this invocation
+        // shares both, so the UI can group them as a single "compliance check" entry
+        // with precise date+time.
+        String runId = java.util.UUID.randomUUID().toString();
+        java.time.LocalDateTime runDate = java.time.LocalDateTime.now();
 
         List<ComplianceRecord> results = new ArrayList<>();
 
@@ -93,6 +100,8 @@ public class ComplianceServiceImpl implements ComplianceService {
                     .result(docsOk ? ComplianceResult.PASS : ComplianceResult.FAIL)
                     .date(LocalDate.now())
                     .notes(docNotes)
+                    .runId(runId)
+                    .runDate(runDate)
                     .build()));
 
             List<SLARecordDto> slaRecords = workflowServiceClient.getSlaRecordsByCase(caseId);
@@ -113,13 +122,18 @@ public class ComplianceServiceImpl implements ComplianceService {
                     .result(slaOk ? ComplianceResult.PASS : ComplianceResult.FAIL)
                     .date(LocalDate.now())
                     .notes(slaNotes)
+                    .runId(runId)
+                    .runDate(runDate)
                     .build()));
 
             if (!docsOk || !slaOk) {
-                sendNotification(userId, caseId,
-                        "Compliance failure for Case #" + caseId
+                String failMsg = "Compliance failure for Case #" + caseId
                         + (!docsOk ? " [DOCUMENT: " + docNotes + "]" : "")
-                        + (!slaOk  ? " [PROCESS: " + breached + " SLA breach(es)]" : ""));
+                        + (!slaOk  ? " [PROCESS: " + breached + " SLA breach(es)]" : "");
+                // Notify the user who ran the check (so they see the failure inline)
+                sendNotification(userId, caseId, failMsg);
+                // Per spec: COMPLIANCE FAILURE escalates to Court Administrator(s).
+                notifyAllAdmins(caseId, failMsg);
             }
         }
 
@@ -199,8 +213,10 @@ public class ComplianceServiceImpl implements ComplianceService {
         audit.setStatus(AuditStatus.CLOSED);
         audit.setDate(LocalDate.now());
         Audit saved = auditRepository.save(audit);
-        sendNotification(userId, null,
-                "Audit #" + auditId + " has been closed. Scope: " + audit.getScope());
+        // Notify the closer + all admins so the audit close is visible to oversight.
+        String msg = "Audit #" + auditId + " has been closed. Scope: " + audit.getScope();
+        sendNotification(userId, null, msg);
+        notifyAllAdmins(null, msg);
         return toAuditResponse(saved);
     }
 
@@ -220,12 +236,165 @@ public class ComplianceServiceImpl implements ComplianceService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public void deleteComplianceRecord(Long complianceId) {
+        if (!complianceRecordRepository.existsById(complianceId)) {
+            throw new ResourceNotFoundException("Compliance record not found: #" + complianceId);
+        }
+        complianceRecordRepository.deleteById(complianceId);
+        log.info("Deleted compliance record #{}", complianceId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteAudit(Long auditId) {
+        if (!auditRepository.existsById(auditId)) {
+            throw new ResourceNotFoundException("Audit not found: #" + auditId);
+        }
+        auditRepository.deleteById(auditId);
+        log.info("Deleted audit #{}", auditId);
+    }
+
+    @Override
+    @Transactional
+    public long deleteComplianceRecords(java.util.List<Long> complianceIds) {
+        if (complianceIds == null || complianceIds.isEmpty()) return 0L;
+        long before = complianceRecordRepository.count();
+        complianceRecordRepository.deleteAllByIdInBatch(complianceIds);
+        long after = complianceRecordRepository.count();
+        long deleted = before - after;
+        log.info("Bulk-deleted {} compliance record(s)", deleted);
+        return deleted;
+    }
+
+    @Override
+    @Transactional
+    public long deleteAudits(java.util.List<Long> auditIds) {
+        if (auditIds == null || auditIds.isEmpty()) return 0L;
+        long before = auditRepository.count();
+        auditRepository.deleteAllByIdInBatch(auditIds);
+        long after = auditRepository.count();
+        long deleted = before - after;
+        log.info("Bulk-deleted {} audit(s)", deleted);
+        return deleted;
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.caseflow.compliance.dto.ComplianceRunSummary> getAllRuns() {
+        List<ComplianceRecord> all = complianceRecordRepository.findAll();
+        // Group by runId; fallback to "date-yyyy-mm-dd" for legacy records (no runId).
+        java.util.Map<String, java.util.List<ComplianceRecord>> groups = new java.util.LinkedHashMap<>();
+        for (ComplianceRecord r : all) {
+            String key = r.getRunId() != null
+                    ? r.getRunId()
+                    : "date-" + (r.getDate() != null ? r.getDate().toString() : "unknown");
+            groups.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(r);
+        }
+        java.util.List<com.caseflow.compliance.dto.ComplianceRunSummary> summaries = new java.util.ArrayList<>();
+        for (java.util.Map.Entry<String, java.util.List<ComplianceRecord>> e : groups.entrySet()) {
+            java.util.List<ComplianceRecord> recs = e.getValue();
+            String runId = e.getKey();
+            boolean legacy = runId.startsWith("date-");
+            int cases = (int) recs.stream().map(ComplianceRecord::getCaseId).distinct().count();
+            int checks = recs.size();
+            int passes = (int) recs.stream().filter(x -> x.getResult() == ComplianceRecord.ComplianceResult.PASS).count();
+            int fails  = (int) recs.stream().filter(x -> x.getResult() == ComplianceRecord.ComplianceResult.FAIL).count();
+            int docFails = (int) recs.stream()
+                    .filter(x -> x.getResult() == ComplianceRecord.ComplianceResult.FAIL
+                              && x.getType() == ComplianceRecord.ComplianceType.DOCUMENT)
+                    .count();
+            int procFails = (int) recs.stream()
+                    .filter(x -> x.getResult() == ComplianceRecord.ComplianceResult.FAIL
+                              && x.getType() == ComplianceRecord.ComplianceType.PROCESS)
+                    .count();
+            java.time.LocalDateTime runDate = recs.stream()
+                    .map(ComplianceRecord::getRunDate)
+                    .filter(java.util.Objects::nonNull)
+                    .max(java.util.Comparator.naturalOrder())
+                    .orElse(null);
+            java.time.LocalDate date = recs.stream()
+                    .map(ComplianceRecord::getDate)
+                    .filter(java.util.Objects::nonNull)
+                    .max(java.util.Comparator.naturalOrder())
+                    .orElse(null);
+            summaries.add(com.caseflow.compliance.dto.ComplianceRunSummary.builder()
+                    .runId(runId)
+                    .legacy(legacy)
+                    .runDate(runDate)
+                    .date(date)
+                    .cases(cases)
+                    .checks(checks)
+                    .passes(passes)
+                    .fails(fails)
+                    .documentFails(docFails)
+                    .processFails(procFails)
+                    .build());
+        }
+        // Newest first — sort by runDate desc, falling back to date desc
+        summaries.sort((a, b) -> {
+            java.time.LocalDateTime ta = a.getRunDate();
+            java.time.LocalDateTime tb = b.getRunDate();
+            if (ta != null && tb != null) return tb.compareTo(ta);
+            if (ta != null) return -1;
+            if (tb != null) return 1;
+            java.time.LocalDate da = a.getDate(), db = b.getDate();
+            if (da == null && db == null) return 0;
+            if (da == null) return 1;
+            if (db == null) return -1;
+            return db.compareTo(da);
+        });
+        return summaries;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ComplianceRecordResponse> getRunRecords(String runId) {
+        if (runId == null || runId.isBlank()) return java.util.List.of();
+        java.util.List<ComplianceRecord> recs;
+        if (runId.startsWith("date-")) {
+            // legacy synthetic id — return records without runId on that date
+            String dateStr = runId.substring("date-".length());
+            try {
+                java.time.LocalDate d = java.time.LocalDate.parse(dateStr);
+                recs = complianceRecordRepository.findAll().stream()
+                        .filter(r -> r.getRunId() == null && d.equals(r.getDate()))
+                        .collect(Collectors.toList());
+            } catch (Exception e) {
+                return java.util.List.of();
+            }
+        } else {
+            recs = complianceRecordRepository.findAll().stream()
+                    .filter(r -> runId.equals(r.getRunId()))
+                    .collect(Collectors.toList());
+        }
+        return recs.stream().map(this::toComplianceResponse).collect(Collectors.toList());
+    }
+
     private void sendNotification(String userId, Long caseId, String message) {
+        if (userId == null || userId.isBlank()) return;
         try {
             notificationServiceClient.createNotification(
                     new NotificationRequest(userId, caseId, message, "COMPLIANCE"));
         } catch (Exception e) {
             log.warn("Notification delivery failed (non-critical): {}", e.getMessage());
+        }
+    }
+
+    /** Fan out a compliance failure / audit notification to every active ADMIN. */
+    private void notifyAllAdmins(Long caseId, String message) {
+        try {
+            var recipients = iamServiceClient.getUsersByRole("ADMIN");
+            if (recipients == null) return;
+            for (var u : recipients) {
+                if (u == null || u.getUserId() == null) continue;
+                if (u.getStatus() != null && !"ACTIVE".equalsIgnoreCase(u.getStatus())) continue;
+                sendNotification(u.getUserId(), caseId, message);
+            }
+        } catch (Exception e) {
+            log.warn("Could not fan out compliance notification to ADMINs: {}", e.getMessage());
         }
     }
 
@@ -242,6 +411,8 @@ public class ComplianceServiceImpl implements ComplianceService {
                 .result(r.getResult())
                 .date(r.getDate())
                 .notes(r.getNotes())
+                .runId(r.getRunId())
+                .runDate(r.getRunDate())
                 .build();
     }
 

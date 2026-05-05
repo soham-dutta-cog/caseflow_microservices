@@ -19,6 +19,8 @@ public class Document {
     @Column(nullable = false) private LocalDateTime uploadedDate;
     @Column(nullable = false) @Enumerated(EnumType.STRING) private VerificationStatus verificationStatus;
     @Column(nullable = false) private String uploadedBy;
+    /** User-id of the clerk who verified or rejected this document. Null until verification action is taken. */
+    @Column(length = 50) private String verifiedBy;
     private String rejectionReason;
 
     @Column(length = 500)

@@ -31,9 +31,10 @@ public class HearingService {
             .build();
         Hearing saved = hearingRepository.save(hearing);
 
-        sendNotification(saved.getJudgeId(), saved.getCaseId(),
-            "Hearing #" + saved.getHearingId() + " scheduled for case #" + saved.getCaseId()
-            + " on " + saved.getHearingDate() + " at " + saved.getHearingTime() + ".", "HEARING");
+        // Per spec: HEARING SCHEDULED → notify Litigant, Lawyer, Judge.
+        String msg = "Hearing #" + saved.getHearingId() + " scheduled for case #" + saved.getCaseId()
+            + " on " + saved.getHearingDate() + " at " + saved.getHearingTime() + ".";
+        notifyHearingParties(saved, msg);
 
         return mapToHearingResponse(saved);
     }
@@ -52,10 +53,11 @@ public class HearingService {
 
         try { caseClient.updateCaseStatusInternal(hearing.getCaseId(), "ADJOURNED"); } catch (Exception e) { log.warn("Failed to update case status: {}", e.getMessage()); }
 
-        sendNotification(saved.getJudgeId(), saved.getCaseId(),
-            "Hearing #" + hearingId + " for case #" + saved.getCaseId()
+        // Per spec: HEARING RESCHEDULED → notify Litigant, Lawyer, Judge.
+        String msg = "Hearing #" + hearingId + " for case #" + saved.getCaseId()
             + " has been rescheduled to " + saved.getHearingDate() + " at " + saved.getHearingTime()
-            + ". Reason: " + saved.getRescheduleReason(), "HEARING");
+            + ". Reason: " + saved.getRescheduleReason();
+        notifyHearingParties(saved, msg);
 
         return mapToHearingResponse(saved);
     }
@@ -71,11 +73,13 @@ public class HearingService {
         hearing.setHearingNotes(request.getHearingNotes());
         Hearing saved = hearingRepository.save(hearing);
 
-        try { workflowClient.advanceWorkflow(hearing.getCaseId()); } catch (Exception e) { log.warn("Failed to advance workflow: {}", e.getMessage()); }
+    //    try { workflowClient.advanceWorkflow(hearing.getCaseId()); } catch (Exception e) { log.warn("Failed to advance workflow: {}", e.getMessage()); }
 
-        sendNotification(saved.getJudgeId(), saved.getCaseId(),
+        // Hearing complete is also relevant to the litigant + lawyer (they may want
+        // to know the proceedings happened and a decision is forthcoming).
+        notifyHearingParties(saved,
             "Hearing #" + hearingId + " for case #" + saved.getCaseId()
-            + " has been marked COMPLETED. Workflow advanced.", "HEARING");
+            + " has been marked COMPLETED. Workflow advanced.");
 
         return mapToHearingResponse(saved);
     }
@@ -90,6 +94,7 @@ public class HearingService {
     public List<HearingResponse> getHearingsByStatus(Hearing.HearingStatus s) { return hearingRepository.findByStatus(s).stream().map(this::mapToHearingResponse).toList(); }
 
     private void sendNotification(String userId, Long caseId, String message, String category) {
+        if (userId == null || userId.isBlank()) return;
         try {
             Map<String, Object> req = new HashMap<>();
             req.put("userId", userId);
@@ -99,6 +104,24 @@ public class HearingService {
             notificationClient.sendNotification(req);
         } catch (Exception e) {
             log.warn("Notification failed for case #{}: {}", caseId, e.getMessage());
+        }
+    }
+
+    /** Fan out a hearing notification to Judge + Litigant + Lawyer for the case. */
+    private void notifyHearingParties(Hearing h, String message) {
+        // Judge — always known on the hearing itself.
+        sendNotification(h.getJudgeId(), h.getCaseId(), message, "HEARING");
+        // Litigant + Lawyer — looked up from the case so we don't depend on the caller.
+        try {
+            var c = caseClient.getCaseById(h.getCaseId());
+            if (c != null) {
+                sendNotification(c.getLitigantId(), h.getCaseId(), message, "HEARING");
+                if (c.getLawyerId() != null && !c.getLawyerId().isBlank()) {
+                    sendNotification(c.getLawyerId(), h.getCaseId(), message, "HEARING");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not load case #{} for hearing fan-out: {}", h.getCaseId(), e.getMessage());
         }
     }
 

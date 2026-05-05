@@ -28,6 +28,14 @@ public class Review {
     @Column(name = "judge_id", nullable = false, length = 50)
     private String judgeId;
 
+    /**
+     * User-id of the actor (typically a CLERK or ADMIN) who opened this review and
+     * assigned the judge. Nullable for backward-compatibility with reviews created
+     * before this column existed.
+     */
+    @Column(name = "assigned_by_clerk_id", length = 50)
+    private String assignedByClerkId;
+
     @Column(name = "review_date", nullable = false)
     private LocalDateTime reviewDate;
 

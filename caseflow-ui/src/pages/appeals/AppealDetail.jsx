@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { appeals } from '../../api/services'
+import { appeals, users, hearings as hearingsApi } from '../../api/services'
 import {
   REVIEW_OUTCOME, REVIEW_OUTCOME_LABELS,
   APPEAL_DOC_TYPES, APPEAL_AUDIT_ACTIONS,
   statusBadgeClass, formatDateTime,
+  UPLOAD_ALLOWED_EXTENSIONS, UPLOAD_ACCEPT_ATTR, validateUpload, formatBytes,
 } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -38,6 +39,11 @@ export default function AppealDetail() {
   const [busy, setBusy]      = useState(false)
 
   const [judgeId, setJudgeId] = useState('')
+  const [judges, setJudges]   = useState([])
+  const [judgesLoading, setJudgesLoading] = useState(false)
+  // judges who already presided over hearings on this case — they CANNOT
+  // be re-assigned to review the appeal (conflict of interest).
+  const [excludedJudgeIds, setExcludedJudgeIds] = useState(new Set())
   const [decision, setDecision] = useState({ outcome: 'APPEAL_UPHELD', remarks: '' })
   const [draftOutcome, setDraftOutcome] = useState('')
   const [uploadForm, setUploadForm] = useState({ title: '', type: 'PETITION', file: null })
@@ -67,6 +73,37 @@ export default function AppealDetail() {
   useEffect(() => { load() }, [appealId])
   useEffect(() => { if (showAudit) loadAudit() }, [showAudit, appealId])
 
+  // Load list of judges for the assignment dropdown
+  useEffect(() => {
+    setJudgesLoading(true)
+    users.byRole('JUDGE')
+      .then(data => setJudges(Array.isArray(data) ? data : []))
+      .catch(() => setJudges([]))
+      .finally(() => setJudgesLoading(false))
+  }, [])
+
+  // When the appeal loads, fetch the case's hearings and collect every judge
+  // who has presided over the case so we can exclude them from the
+  // appeal-routing dropdown (a judge cannot review their own decision).
+  useEffect(() => {
+    if (!a?.caseId) return
+    let active = true
+    hearingsApi.byCase(a.caseId)
+      .then(list => {
+        if (!active) return
+        const ids = new Set()
+        ;(list || []).forEach(h => {
+          if (h?.judgeId) ids.add(String(h.judgeId))
+        })
+        setExcludedJudgeIds(ids)
+      })
+      .catch(() => { if (active) setExcludedJudgeIds(new Set()) })
+    return () => { active = false }
+  }, [a?.caseId])
+
+  // Filtered list shown in the dropdown (eligible judges only)
+  const eligibleJudges = judges.filter(j => !excludedJudgeIds.has(String(j.userId)))
+
   // ── Action wrappers ────────────────────────────────────────────────────
   const wrap = async (label, fn) => {
     setErr(''); setMsg(''); setBusy(true)
@@ -86,6 +123,13 @@ export default function AppealDetail() {
 
   const onPickFile = (file) => {
     if (!file) return
+    const v = validateUpload(file)
+    if (v) {
+      window.alert(v)
+      setErr(v)
+      return
+    }
+    setErr('')
     setUploadForm(f => ({
       ...f,
       file,
@@ -99,7 +143,14 @@ export default function AppealDetail() {
   }
   const uploadDoc = async (e) => {
     e.preventDefault()
-    setErr(''); setMsg(''); setBusy(true)
+    setErr(''); setMsg('')
+    if (!uploadForm.file) {
+      const m = 'Please select a file to upload.'
+      setErr(m); window.alert(m); return
+    }
+    const v = validateUpload(uploadForm.file)
+    if (v) { setErr(v); window.alert(v); return }
+    setBusy(true)
     try {
       const fd = new FormData()
       fd.append('title', uploadForm.title.trim())
@@ -109,8 +160,10 @@ export default function AppealDetail() {
       setMsg('Document uploaded')
       setUploadForm({ title: '', type: 'PETITION', file: null })
       load()
-    } catch (e) { setErr(e.message) }
-    finally   { setBusy(false) }
+    } catch (e) {
+      const m = e?.message || 'Upload failed.'
+      setErr(m); window.alert(m)
+    } finally   { setBusy(false) }
   }
   const deleteDoc = async (docId) => {
     if (!confirm(`Delete document #${docId}?`)) return
@@ -228,20 +281,42 @@ export default function AppealDetail() {
               <div className="appeal-decide-banner">
                 <i className="bi bi-info-circle-fill" />
                 <div>
-                  Assign a judge to start the review. The judge will be validated against IAM and
-                  cannot be reassigned to two active appeals on the same case.
+                  Assign a judge to start the review. Judges who already presided over a hearing
+                  on this case are excluded to avoid a conflict of interest.
+                  {excludedJudgeIds.size > 0 && (
+                    <div className="small text-muted mt-1">
+                      Excluded ({excludedJudgeIds.size}):{' '}
+                      {[...excludedJudgeIds].join(', ')}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="row g-3">
                 <div className="col-md-8">
-                  <label className="form-label fw-semibold small">Judge ID *</label>
-                  <input
-                    className="form-control"
+                  <label className="form-label fw-semibold small">Select Judge *</label>
+                  <select
+                    className="form-select"
                     value={judgeId}
                     onChange={e => setJudgeId(e.target.value)}
-                    placeholder="IAM judge id (e.g. JOH_JUDGE_1)"
+                    disabled={judgesLoading || busy}
                     required
-                  />
+                  >
+                    <option value="">
+                      {judgesLoading
+                        ? 'Loading judges…'
+                        : eligibleJudges.length === 0
+                          ? '— No eligible judges (all presided over this case) —'
+                          : '— Select a judge —'}
+                    </option>
+                    {eligibleJudges.map(j => (
+                      <option key={j.userId} value={j.userId}>
+                        {j.name || j.username || j.email || '(unnamed)'} &nbsp;—&nbsp; {j.userId}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="form-text small">
+                    Judges are loaded from the IAM service. The selected judge's user-id will be assigned.
+                  </div>
                 </div>
                 <div className="col-md-4 d-flex align-items-end">
                   <button className="btn btn-dark w-100" disabled={!judgeId.trim() || busy}>
@@ -449,14 +524,14 @@ export default function AppealDetail() {
                       {uploadForm.file ? 'Click or drop to replace' : 'Click or drop a file here'}
                     </div>
                     <div className="appeal-dropzone__hint">
-                      Max 10 MB · PDF, DOC(X), XLS(X), PPT(X), TXT, images, ZIP, RAR
+                      Max <strong>10 MB</strong> · Allowed: {UPLOAD_ALLOWED_EXTENSIONS.join(', ')}
                     </div>
                     {uploadForm.file && (
                       <div className="appeal-dropzone__file">
                         <i className="bi bi-file-earmark-check" />
                         {uploadForm.file.name}
                         <span className="text-muted small">
-                          ({(uploadForm.file.size / 1024).toFixed(1)} KB)
+                          ({formatBytes(uploadForm.file.size)})
                         </span>
                       </div>
                     )}
@@ -464,6 +539,7 @@ export default function AppealDetail() {
                       ref={fileInputRef}
                       type="file"
                       hidden
+                      accept={UPLOAD_ACCEPT_ATTR}
                       onChange={e => onPickFile(e.target.files?.[0])}
                     />
                   </div>

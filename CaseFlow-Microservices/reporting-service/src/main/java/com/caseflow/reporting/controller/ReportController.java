@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -116,5 +117,16 @@ public class ReportController {
             @PathVariable String lawyerId) {
         roleGuard.requireAnyRole(userRole, "ADMIN", "CLERK", "LAWYER");
         return ResponseEntity.ok(reportService.getReportsByScopeAndValue(ReportScope.LAWYER, lawyerId));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete a generated report", description = "Permanently removes a report. Roles: ADMIN.")
+    public ResponseEntity<Void> deleteReport(
+            @Parameter(hidden = true)
+            @RequestHeader(value = "X-Auth-User-Role", required = false) String userRole,
+            @PathVariable Long id) {
+        roleGuard.requireAnyRole(userRole, "ADMIN");
+        reportService.deleteReport(id);
+        return ResponseEntity.noContent().build();
     }
 }

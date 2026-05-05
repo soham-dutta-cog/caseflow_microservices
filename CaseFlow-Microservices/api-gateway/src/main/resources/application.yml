@@ -6,6 +6,11 @@ spring:
     name: api-gateway
   main:
     web-application-type: reactive
+  codec:
+    # Allow multipart uploads up to ~12MB to pass through the gateway buffer.
+    # Without this, Spring Cloud Gateway's default ~256KB in-memory codec
+    # limit causes large uploads to fail with "DataBufferLimitException".
+    max-in-memory-size: 12MB
   cloud:
     gateway:
       discovery:

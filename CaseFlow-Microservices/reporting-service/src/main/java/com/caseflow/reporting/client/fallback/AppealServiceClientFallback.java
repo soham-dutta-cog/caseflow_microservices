@@ -32,6 +32,12 @@ public class AppealServiceClientFallback implements AppealServiceClient {
     }
 
     @Override
+    public List<AppealDto> getAppealsByUser(String userId) {
+        log.warn("appeal-service unavailable — returning empty appeals for user {}", userId);
+        return Collections.emptyList();
+    }
+
+    @Override
     public List<AppealDto> getAppealsByStatus(String status) {
         log.warn("appeal-service unavailable — returning empty list for status {}", status);
         return Collections.emptyList();
@@ -44,8 +50,8 @@ public class AppealServiceClientFallback implements AppealServiceClient {
     }
 
     @Override
-    public List<ReviewDto> getReviewsByJudge(Long judgeId) {
-        log.warn("appeal-service unavailable — returning empty reviews for judge #{}", judgeId);
+    public List<ReviewDto> getReviewsByJudge(String judgeId) {
+        log.warn("appeal-service unavailable — returning empty reviews for judge {}", judgeId);
         return Collections.emptyList();
     }
 }

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 
 export default function AuditList() {
   const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
 
   const [audits, setAudits]   = useState([])
   const [loading, setLoading] = useState(true)
@@ -17,6 +18,50 @@ export default function AuditList() {
   const [editFindings, setEditFindings] = useState({})
   const [savingId, setSavingId]         = useState(null)
   const [closingId, setClosingId]       = useState(null)
+  const [deletingId, setDeletingId]     = useState(null)
+  const [selected, setSelected]         = useState(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  const toggleSelected = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+  const toggleAllSelected = () => {
+    if (selected.size === audits.length) setSelected(new Set())
+    else setSelected(new Set(audits.map(a => a.auditId)))
+  }
+  const clearSelection = () => setSelected(new Set())
+
+  const bulkDelete = async () => {
+    if (selected.size === 0) return
+    if (!window.confirm(`Delete ${selected.size} selected audit${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    setBulkDeleting(true); setErr(''); setMsg('')
+    try {
+      const ids = Array.from(selected)
+      const res = await compliance.bulkDeleteAudits(ids)
+      const n = res?.deleted ?? ids.length
+      setMsg(`${n} audit${n !== 1 ? 's' : ''} deleted.`)
+      clearSelection()
+      load()
+    } catch (e) {
+      setErr(e.message || 'Bulk delete failed')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const deleteAudit = async (id) => {
+    if (!window.confirm(`Delete audit #${id}? This cannot be undone.`)) return
+    setDeletingId(id); setErr(''); setMsg('')
+    try {
+      await compliance.deleteAudit(id)
+      setMsg(`Audit #${id} deleted.`)
+      setAudits(prev => prev.filter(a => a.auditId !== id))
+    } catch (e) { setErr(e.message) } finally { setDeletingId(null) }
+  }
 
   const load = async () => {
     setLoading(true); setErr('')
@@ -173,12 +218,54 @@ export default function AuditList() {
           <h2 className="h6 mb-0 fw-semibold d-flex align-items-center gap-2">
             <i className="bi bi-clipboard-data text-muted" />All Audits
           </h2>
-          {audits.length > 0 && (
-            <div className="d-flex gap-1">
-              <span className="badge text-bg-info">{openCount} Open</span>
-              <span className="badge text-bg-success">{closedCount} Closed</span>
-            </div>
-          )}
+          <div className="d-flex gap-2 align-items-center flex-wrap">
+            {isAdmin && audits.length > 0 && (
+              <>
+                <div className="form-check m-0">
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    id="audit-select-all"
+                    checked={selected.size === audits.length && audits.length > 0}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < audits.length }}
+                    onChange={toggleAllSelected}
+                  />
+                  <label htmlFor="audit-select-all" className="form-check-label small text-muted">
+                    Select all
+                  </label>
+                </div>
+                {selected.size > 0 && (
+                  <>
+                    <span className="badge text-bg-primary">{selected.size} selected</span>
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary btn-sm"
+                      onClick={clearSelection}
+                    >
+                      <i className="bi bi-x-lg me-1" />Clear
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm d-flex align-items-center gap-1"
+                      disabled={bulkDeleting}
+                      onClick={bulkDelete}
+                    >
+                      {bulkDeleting
+                        ? <><span className="spinner-border spinner-border-sm" />Deleting…</>
+                        : <><i className="bi bi-trash3" />Delete Selected</>}
+                    </button>
+                  </>
+                )}
+                <span className="vr" />
+              </>
+            )}
+            {audits.length > 0 && (
+              <>
+                <span className="badge text-bg-info">{openCount} Open</span>
+                <span className="badge text-bg-success">{closedCount} Closed</span>
+              </>
+            )}
+          </div>
         </div>
         <div className="card-body p-0">
           {loading ? (
@@ -196,12 +283,25 @@ export default function AuditList() {
                 const isClosed  = a.status === 'CLOSED'
                 const isLast    = idx === audits.length - 1
 
+                const isSelected = selected.has(a.auditId)
                 return (
                   <div
                     key={a.auditId}
                     className={`px-4 py-3 ${!isLast ? 'border-bottom' : ''}`}
+                    style={isSelected ? { background: '#eff6ff' } : {}}
                   >
                     <div className="d-flex align-items-start gap-3">
+                      {/* Selection checkbox (admin only) */}
+                      {isAdmin && (
+                        <div className="pt-2 flex-shrink-0">
+                          <input
+                            type="checkbox"
+                            className="form-check-input"
+                            checked={isSelected}
+                            onChange={() => toggleSelected(a.auditId)}
+                          />
+                        </div>
+                      )}
                       {/* Timeline dot */}
                       <div className="d-flex flex-column align-items-center pt-1 flex-shrink-0">
                         <div
@@ -304,6 +404,19 @@ export default function AuditList() {
                             <span className="text-success small d-flex align-items-center gap-1">
                               <i className="bi bi-check-circle-fill" /> Audit closed and locked
                             </span>
+                          )}
+                          {isAdmin && (
+                            <button
+                              className="btn btn-outline-danger btn-sm d-flex align-items-center gap-1"
+                              title="Delete this audit (admin only)"
+                              disabled={deletingId === a.auditId}
+                              onClick={() => deleteAudit(a.auditId)}
+                            >
+                              {deletingId === a.auditId
+                                ? <span className="spinner-border spinner-border-sm" />
+                                : <i className="bi bi-trash3" />}
+                              Delete
+                            </button>
                           )}
                         </div>
                       </div>

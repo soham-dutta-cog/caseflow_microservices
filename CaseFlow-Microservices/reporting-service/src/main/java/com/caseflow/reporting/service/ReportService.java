@@ -12,4 +12,6 @@ public interface ReportService {
     List<ReportResponse> getReportsByUser(String userId);
     List<ReportResponse> getReportsByScope(Report.ReportScope scope);
     List<ReportResponse> getReportsByScopeAndValue(Report.ReportScope scope, String scopeValue);
+
+    void deleteReport(Long reportId);
 }

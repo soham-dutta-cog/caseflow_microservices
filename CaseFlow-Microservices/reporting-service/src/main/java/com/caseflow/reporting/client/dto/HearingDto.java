@@ -10,7 +10,10 @@ import java.time.LocalDate;
 public class HearingDto {
     private Long hearingId;
     private Long caseId;
-    private Long judgeId;
+    /** Judge user-id (IAM format, e.g. "JOH_JUDGE_1"). */
+    private String judgeId;
     private String status;          // SCHEDULED, RESCHEDULED, COMPLETED, CANCELLED
     private LocalDate hearingDate;
+    /** User-id of the clerk who scheduled this hearing. */
+    private String scheduledBy;
 }

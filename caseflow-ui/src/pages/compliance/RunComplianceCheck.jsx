@@ -1,8 +1,39 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { compliance } from '../../api/services'
+import { compliance, cases } from '../../api/services'
 import { statusBadgeClass, formatDate } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
+import { CaseSlaSummary, useCaseEnrichment } from './ComplianceRunDetail'
+
+/* ─── Renders one CaseSlaSummary card per case checked in this run ───── */
+function RunCasesView({ caseIds }) {
+  const { data, loading } = useCaseEnrichment(caseIds)
+  if (loading) {
+    return (
+      <div className="text-center text-muted py-3">
+        <span className="spinner-border spinner-border-sm me-2" />
+        Loading SLA stages and documents…
+      </div>
+    )
+  }
+  return (
+    <div className="d-flex flex-column gap-3">
+      {caseIds.map(caseId => {
+        const e = data[caseId] || { stages: [], slaRecords: [], docs: [], caseInfo: null }
+        return (
+          <CaseSlaSummary
+            key={caseId}
+            caseId={caseId}
+            stages={e.stages}
+            slaRecords={e.slaRecords}
+            docs={e.docs}
+            caseInfo={e.caseInfo}
+          />
+        )
+      })}
+    </div>
+  )
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    Run Compliance Check — Module 4.6
@@ -16,6 +47,8 @@ export default function RunComplianceCheck() {
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const [caseIdsInput, setCaseIdsInput] = useState('')
+  const [dateFrom, setDateFrom]         = useState('')
+  const [dateTo, setDateTo]             = useState('')
   const [running, setRunning]           = useState(false)
   const [checkErr, setCheckErr]         = useState('')
 
@@ -56,20 +89,55 @@ export default function RunComplianceCheck() {
     setAuditErr('')
 
     const raw = caseIdsInput.trim()
-    const caseIds = raw
+    let caseIds = raw
       ? raw.split(',').map(s => s.trim()).filter(Boolean).map(Number).filter(n => !isNaN(n) && n > 0)
       : []
 
-    setCheckedIds(caseIds)
+    // Validate date range if both provided
+    if (dateFrom && dateTo && new Date(dateFrom) > new Date(dateTo)) {
+      setCheckErr('Date From must be on or before Date To.')
+      setRunning(false)
+      return
+    }
+
+    let dateFilterApplied = false
+    let dateFilteredCount = 0
 
     try {
+      // If user typed Case IDs they take priority. Otherwise, if a date range
+      // is provided, fetch all cases and filter to those filed within the range.
+      if (caseIds.length === 0 && (dateFrom || dateTo)) {
+        const all = await cases.list() || []
+        const fromMs = dateFrom ? new Date(dateFrom).getTime() : -Infinity
+        // Date To is inclusive of the whole day
+        const toMs   = dateTo   ? new Date(dateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : Infinity
+        const filtered = all.filter(c => {
+          if (!c.filedDate) return false
+          const t = new Date(c.filedDate).getTime()
+          return t >= fromMs && t <= toMs
+        })
+        caseIds = filtered.map(c => c.caseId).filter(Boolean)
+        dateFilterApplied = true
+        dateFilteredCount = caseIds.length
+
+        if (caseIds.length === 0) {
+          setCheckErr('No cases were filed in the selected date range. Try widening the range or clearing the dates.')
+          setRunning(false)
+          return
+        }
+      }
+
+      setCheckedIds(caseIds)
+
       const data = await compliance.runCheck({ caseIds })
       setResults(data || [])
 
       // Pre-fill audit scope with a sensible default
-      const scopeLabel = caseIds.length
+      const scopeLabel = raw
         ? `Cases: ${caseIds.join(', ')}`
-        : `All cases — ${new Date().toLocaleDateString()}`
+        : dateFilterApplied
+          ? `Cases filed ${dateFrom || '...'} → ${dateTo || '...'} (${dateFilteredCount} case${dateFilteredCount !== 1 ? 's' : ''})`
+          : `All cases — ${new Date().toLocaleDateString()}`
       setAuditScope(scopeLabel)
     } catch (e) {
       setCheckErr(
@@ -126,15 +194,62 @@ export default function RunComplianceCheck() {
             <div className="mb-3">
               <label className="form-label fw-semibold small">
                 Case IDs&nbsp;
-                <span className="text-muted fw-normal">(comma-separated — leave blank to check ALL cases)</span>
+                <span className="text-muted fw-normal">(comma-separated — leave blank to check ALL cases or use the date range below)</span>
               </label>
               <input
                 className="form-control"
-                placeholder="e.g.  1, 3, 7   — or leave blank for all"
+                placeholder="e.g.  1, 3, 7   — or leave blank to use the date range / check all"
                 value={caseIdsInput}
                 onChange={e => setCaseIdsInput(e.target.value)}
                 disabled={running}
               />
+            </div>
+
+            {/* Date range — only used when Case IDs is blank */}
+            <div className="row g-3 mb-3">
+              <div className="col-md-6">
+                <label className="form-label fw-semibold small">
+                  Date From <span className="text-muted fw-normal">(filed on/after)</span>
+                </label>
+                <input
+                  className="form-control"
+                  type="date"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                  disabled={running || caseIdsInput.trim().length > 0}
+                />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label fw-semibold small">
+                  Date To <span className="text-muted fw-normal">(filed on/before)</span>
+                </label>
+                <input
+                  className="form-control"
+                  type="date"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                  disabled={running || caseIdsInput.trim().length > 0}
+                />
+              </div>
+              {caseIdsInput.trim().length === 0 && (dateFrom || dateTo) && (
+                <div className="col-12">
+                  <div className="alert alert-info py-2 mb-0 small d-flex align-items-center gap-2">
+                    <i className="bi bi-funnel-fill" />
+                    Compliance check will run for cases filed
+                    {dateFrom && <> on/after <strong>{dateFrom}</strong></>}
+                    {dateFrom && dateTo && ' '}
+                    {dateTo && <> on/before <strong>{dateTo}</strong></>}.
+                  </div>
+                </div>
+              )}
+              {caseIdsInput.trim().length > 0 && (dateFrom || dateTo) && (
+                <div className="col-12">
+                  <div className="alert alert-warning py-2 mb-0 small d-flex align-items-center gap-2">
+                    <i className="bi bi-exclamation-circle" />
+                    Date range is ignored because specific Case IDs were entered above.
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="d-flex align-items-center gap-3 flex-wrap">
@@ -153,7 +268,11 @@ export default function RunComplianceCheck() {
                 <button
                   type="button"
                   className="btn btn-outline-secondary btn-sm"
-                  onClick={() => { setResults(null); setCaseIdsInput(''); setCheckedIds([]); setAuditMsg(''); setAuditErr('') }}
+                  onClick={() => {
+                    setResults(null); setCaseIdsInput(''); setCheckedIds([])
+                    setDateFrom(''); setDateTo('')
+                    setAuditMsg(''); setAuditErr('')
+                  }}
                 >
                   <i className="bi bi-arrow-counterclockwise me-1" />Clear
                 </button>
@@ -170,209 +289,109 @@ export default function RunComplianceCheck() {
         </div>
       </div>
 
-      {/* ── Step 2 — Results ─────────────────────────────────────────────── */}
-      {results !== null && (
-        <>
-          {/* Summary strip */}
-          <div className="card shadow-sm border-0 mb-4">
-            <div className="card-body">
-              <div className="row g-3 align-items-center">
-                <div className="col-6 col-md-3 text-center">
-                  <div className="h3 fw-bold mb-0">{stats.cases}</div>
-                  <div className="text-muted small mt-1">
-                    <i className="bi bi-folder2 me-1" />Case{stats.cases !== 1 ? 's' : ''} Checked
-                  </div>
+      {/* ── Step 2 — Results: per-case SLA + doc summary (no PASS/FAIL) ── */}
+      {results !== null && results.length === 0 && (
+        <div className="alert alert-warning d-flex align-items-center gap-2 mb-4">
+          <i className="bi bi-exclamation-circle-fill" />
+          No cases were found to check. Make sure cases exist in the system.
+        </div>
+      )}
+
+      {results !== null && results.length > 0 && (() => {
+        const runId = results.find(r => r.runId)?.runId
+        const caseIds = Array.from(new Set(results.map(r => r.caseId))).sort((a, b) => a - b)
+        return (
+          <div className="mb-4">
+            <div className="card shadow-sm border-0 mb-3">
+              <div className="card-header border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2"
+                style={{ background: 'transparent' }}>
+                <div className="d-flex align-items-center gap-2">
+                  <span className="badge rounded-circle text-bg-primary" style={{ width: 24, height: 24, lineHeight: '24px', textAlign: 'center', padding: 0 }}>2</span>
+                  <span className="fw-semibold">Detailed Results</span>
+                  <span className="text-muted small ms-2">{stats.cases} case{stats.cases !== 1 ? 's' : ''} checked</span>
                 </div>
-                <div className="col-6 col-md-3 text-center">
-                  <div className="h3 fw-bold mb-0">{stats.total}</div>
-                  <div className="text-muted small mt-1">
-                    <i className="bi bi-clipboard-check me-1" />Total Checks
-                  </div>
-                </div>
-                <div className="col-6 col-md-3 text-center">
-                  <div className="h3 fw-bold mb-0 text-success">{stats.pass}</div>
-                  <div className="text-muted small mt-1">
-                    <i className="bi bi-check-circle me-1 text-success" />Passed
-                  </div>
-                </div>
-                <div className="col-6 col-md-3 text-center">
-                  <div className="h3 fw-bold mb-0 text-secondary">{stats.fail}</div>
-                  <div className="text-muted small mt-1">
-                    <i className="bi bi-exclamation-circle me-1" />Need Review
-                  </div>
-                </div>
-                {stats.total > 0 && (
-                  <div className="col-12">
-                    <div className="d-flex justify-content-between text-muted small mb-1">
-                      <span>Pass rate</span>
-                      <span>{stats.total > 0 ? Math.round((stats.pass / stats.total) * 100) : 0}%</span>
-                    </div>
-                    <div className="progress" style={{ height: 8, borderRadius: 8 }}>
-                      <div
-                        className="progress-bar bg-success"
-                        style={{ width: `${stats.total > 0 ? (stats.pass / stats.total) * 100 : 0}%` }}
-                      />
-                      <div
-                        className="progress-bar"
-                        style={{
-                          width: `${stats.total > 0 ? (stats.fail / stats.total) * 100 : 0}%`,
-                          background: '#dee2e6',
-                        }}
-                      />
-                    </div>
-                  </div>
+                {runId && (
+                  <Link
+                    to={`/compliance/runs/${encodeURIComponent(runId)}`}
+                    state={{ run: { runId, recs: results } }}
+                    className="btn btn-outline-primary btn-sm"
+                  >
+                    <i className="bi bi-box-arrow-up-right me-1" />Open in Compliance History
+                  </Link>
                 )}
+              </div>
+              <div className="card-body">
+                <RunCasesView caseIds={caseIds} />
               </div>
             </div>
           </div>
+        )
+      })()}
 
-          {/* Overall verdict banner */}
-          {stats.total > 0 && stats.fail === 0 && (
-            <div className="alert alert-success d-flex align-items-center gap-2 mb-4">
-              <i className="bi bi-check-circle-fill fs-5" />
-              <div>
-                <strong>All checks passed.</strong> Every case is fully compliant — all documents verified and no SLA breaches.
+      {/* ── Step 3 — Open an Audit to document findings ─────────────────── */}
+      {results !== null && results.length > 0 && (
+        <div className="card shadow-sm border-0 mb-4">
+          <div className="card-header border-bottom d-flex align-items-center gap-2" style={{ background: 'transparent' }}>
+            <span className="badge rounded-circle text-bg-secondary" style={{ width: 24, height: 24, lineHeight: '24px', textAlign: 'center', padding: 0 }}>3</span>
+            <span className="fw-semibold">Open an Audit Record</span>
+            <span className="text-muted small ms-1">(optional — document and track this compliance review)</span>
+          </div>
+          <div className="card-body">
+            {auditMsg && (
+              <div className="alert alert-success py-2 d-flex align-items-center gap-2">
+                <i className="bi bi-check-circle-fill" />{auditMsg}
+                <Link to="/audits" className="ms-auto btn btn-sm btn-outline-success">Go to Audits</Link>
               </div>
-            </div>
-          )}
-          {stats.fail > 0 && (
-            <div className="alert alert-warning d-flex align-items-start gap-2 mb-4">
-              <i className="bi bi-exclamation-circle-fill fs-5 mt-1" />
-              <div>
-                <strong>{stats.fail} check{stats.fail !== 1 ? 's' : ''} need review</strong> across {failedCaseIds.length} case{failedCaseIds.length !== 1 ? 's' : ''}.
-                {stats.docFail > 0 && <span className="ms-1">Document issues: <strong>{stats.docFail}</strong>.</span>}
-                {stats.procFail > 0 && <span className="ms-1">SLA/Process issues: <strong>{stats.procFail}</strong>.</span>}
-                <span className="ms-1 d-block d-sm-inline">The court administrator has been notified.</span>
-              </div>
-            </div>
-          )}
-          {results.length === 0 && (
-            <div className="alert alert-warning d-flex align-items-center gap-2 mb-4">
-              <i className="bi bi-exclamation-circle-fill" />
-              No cases were found to check. Make sure cases exist in the system.
-            </div>
-          )}
-
-          {/* Detailed results table */}
-          {results.length > 0 && (
-            <div className="card shadow-sm border-0 mb-4">
-              <div className="card-header border-bottom d-flex align-items-center gap-2" style={{ background: 'transparent' }}>
-                <span className="badge rounded-circle text-bg-primary" style={{ width: 24, height: 24, lineHeight: '24px', textAlign: 'center', padding: 0 }}>2</span>
-                <span className="fw-semibold">Detailed Results</span>
-              </div>
-              <div className="card-body p-0">
-                <div className="table-responsive">
-                  <table className="table table-hover align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th>Case</th>
-                        <th>Check Type</th>
-                        <th>Result</th>
-                        <th>Notes</th>
-                        <th>Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results.map((r, i) => (
-                        <tr key={r.complianceId ?? i}>
-                          <td>
-                            <Link to={`/cases/${r.caseId}`} className="fw-semibold">
-                              #{r.caseId}
-                            </Link>
-                          </td>
-                          <td>
-                            <span className={`badge rounded-pill ${r.type === 'DOCUMENT' ? 'text-bg-info' : 'text-bg-secondary'}`}>
-                              <i className={`bi me-1 ${r.type === 'DOCUMENT' ? 'bi-file-earmark-check' : 'bi-diagram-3'}`} />
-                              {r.type}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`badge rounded-pill ${statusBadgeClass(r.result)}`}>
-                              <i className={`bi me-1 ${r.result === 'PASS' ? 'bi-check-circle' : 'bi-x-circle'}`} />
-                              {r.result}
-                            </span>
-                          </td>
-                          <td className="small text-muted" style={{ maxWidth: 320 }}>{r.notes}</td>
-                          <td className="small text-nowrap">{formatDate(r.date)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3 — Open an Audit to document findings */}
-          {results.length > 0 && (
-            <div className="card shadow-sm border-0 mb-4">
-              <div className="card-header border-bottom d-flex align-items-center gap-2" style={{ background: 'transparent' }}>
-                <span className="badge rounded-circle text-bg-secondary" style={{ width: 24, height: 24, lineHeight: '24px', textAlign: 'center', padding: 0 }}>3</span>
-                <span className="fw-semibold">Open an Audit Record</span>
-                <span className="text-muted small ms-1">(optional — document and track this compliance review)</span>
-              </div>
-              <div className="card-body">
-                {auditMsg && (
-                  <div className="alert alert-success py-2 d-flex align-items-center gap-2">
-                    <i className="bi bi-check-circle-fill" />{auditMsg}
-                    <Link to="/audits" className="ms-auto btn btn-sm btn-outline-success">Go to Audits</Link>
+            )}
+            {auditErr && (
+              <div className="alert alert-danger py-2">{auditErr}</div>
+            )}
+            {!auditMsg && (
+              <form onSubmit={handleCreateAudit}>
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label fw-semibold small">Audit Scope <span className="text-danger">*</span></label>
+                    <input
+                      className="form-control"
+                      value={auditScope}
+                      onChange={e => setAuditScope(e.target.value)}
+                      required
+                      disabled={creatingAudit}
+                    />
                   </div>
-                )}
-                {auditErr && (
-                  <div className="alert alert-danger py-2">{auditErr}</div>
-                )}
-                {!auditMsg && (
-                  <form onSubmit={handleCreateAudit}>
-                    <div className="row g-3">
-                      <div className="col-md-6">
-                        <label className="form-label fw-semibold small">Audit Scope <span className="text-danger">*</span></label>
-                        <input
-                          className="form-control"
-                          value={auditScope}
-                          onChange={e => setAuditScope(e.target.value)}
-                          required
-                          disabled={creatingAudit}
-                        />
-                      </div>
-                      <div className="col-12">
-                        <label className="form-label fw-semibold small">
-                          Initial Findings&nbsp;
-                          <span className="text-muted fw-normal">(optional — you can add/update them later)</span>
-                        </label>
-                        <textarea
-                          className="form-control"
-                          rows={3}
-                          placeholder={
-                            stats.fail > 0
-                              ? `${stats.fail} compliance failure(s) detected. Cases: ${failedCaseIds.join(', ')}. See compliance records for details.`
-                              : 'All checks passed. No issues found.'
-                          }
-                          value={auditFindings}
-                          onChange={e => setAuditFindings(e.target.value)}
-                          disabled={creatingAudit}
-                        />
-                      </div>
-                    </div>
-                    <div className="mt-3 d-flex gap-2">
-                      <button
-                        className="btn btn-dark d-flex align-items-center gap-2"
-                        type="submit"
-                        disabled={creatingAudit}
-                      >
-                        {creatingAudit
-                          ? <><span className="spinner-border spinner-border-sm" />Opening audit…</>
-                          : <><i className="bi bi-clipboard-plus" />Open Audit Record</>}
-                      </button>
-                      <Link to="/audits" className="btn btn-outline-secondary">
-                        <i className="bi bi-clipboard-data me-1" />View All Audits
-                      </Link>
-                    </div>
-                  </form>
-                )}
-              </div>
-            </div>
-          )}
-        </>
+                  <div className="col-12">
+                    <label className="form-label fw-semibold small">
+                      Initial Findings&nbsp;
+                      <span className="text-muted fw-normal">(optional — you can add/update them later)</span>
+                    </label>
+                    <textarea
+                      className="form-control"
+                      rows={3}
+                      placeholder={`Compliance check covered ${stats.cases} case(s). See run detail for SLA stages and document counts per case.`}
+                      value={auditFindings}
+                      onChange={e => setAuditFindings(e.target.value)}
+                      disabled={creatingAudit}
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 d-flex gap-2">
+                  <button
+                    className="btn btn-dark d-flex align-items-center gap-2"
+                    type="submit"
+                    disabled={creatingAudit}
+                  >
+                    {creatingAudit
+                      ? <><span className="spinner-border spinner-border-sm" />Opening audit…</>
+                      : <><i className="bi bi-clipboard-plus" />Open Audit Record</>}
+                  </button>
+                  <Link to="/audits" className="btn btn-outline-secondary">
+                    <i className="bi bi-clipboard-data me-1" />View All Audits
+                  </Link>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Empty state (before first run) ───────────────────────────────── */}

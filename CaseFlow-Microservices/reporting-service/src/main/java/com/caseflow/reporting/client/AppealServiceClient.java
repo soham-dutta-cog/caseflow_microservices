@@ -22,6 +22,11 @@ public interface AppealServiceClient {
     @GetMapping("/api/appeals/case/{caseId}")
     List<AppealDto> getAppealsByCase(@PathVariable Long caseId);
 
+    /** Appeals filed by the given user. Used by LAWYER-scope reports to find every
+        appeal that lawyer filed, regardless of whether the case is in their case list. */
+    @GetMapping("/api/appeals/user/{userId}")
+    List<AppealDto> getAppealsByUser(@PathVariable String userId);
+
     @GetMapping("/api/appeals/status/{status}")
     List<AppealDto> getAppealsByStatus(@PathVariable String status);
 
@@ -29,5 +34,5 @@ public interface AppealServiceClient {
     List<ReviewDto> getReviewsByCase(@PathVariable Long caseId);
 
     @GetMapping("/api/appeals/reviews/judge/{judgeId}")
-    List<ReviewDto> getReviewsByJudge(@PathVariable Long judgeId);
+    List<ReviewDto> getReviewsByJudge(@PathVariable String judgeId);
 }

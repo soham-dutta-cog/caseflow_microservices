@@ -11,7 +11,10 @@ public class ReviewDto {
     private Long reviewId;
     private Long appealId;
     private Long caseId;
-    private Long judgeId;
+    /** Judge user-id (IAM format, e.g. "JOH_JUDGE_1"). */
+    private String judgeId;
+    /** User-id of the clerk who opened this review and assigned the judge. */
+    private String assignedByClerkId;
     private String outcome;       // UPHELD, REVERSED, MODIFIED, SENT_BACK
     private LocalDate reviewDate;
 }

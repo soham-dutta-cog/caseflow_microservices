@@ -1,92 +1,118 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { compliance } from '../../api/services'
-import { statusBadgeClass, formatDate } from '../../utils/constants'
+import { formatDate, formatDateTime } from '../../utils/constants'
 import { useAuth } from '../../context/AuthContext'
 import { useLanguage } from '../../context/LanguageContext'
 
-function DonutChart({ value, max = 100, size = 120, strokeWidth = 16, tone = 'success' }) {
-  const r = (size - strokeWidth) / 2
-  const circ = 2 * Math.PI * r
-  const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0
-  const offset = circ - (pct / 100) * circ
-  const colors = { success: '#198754', danger: '#dc3545', warning: '#f59e0b', info: '#0dcaf0', primary: '#0d6efd' }
-  const c = colors[tone] || '#0d6efd'
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e9ecef" strokeWidth={strokeWidth} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={c} strokeWidth={strokeWidth}
-        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-        style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 0.6s ease' }}
-      />
-      <text x="50%" y="44%" dominantBaseline="middle" textAnchor="middle"
-        fontSize={size * 0.21} fontWeight="700" fill={c}>{Math.round(pct)}%</text>
-      <text x="50%" y="64%" dominantBaseline="middle" textAnchor="middle"
-        fontSize={size * 0.12} fill="#6c757d">pass rate</text>
-    </svg>
-  )
-}
-
+/* ───────────────────────────────────────────────────────────────────────
+   Compliance History — one row per compliance-check run.
+   Server aggregates the runs via GET /api/compliance/runs.
+   The UI does NOT show pass/fail. Click a row to see SLA stages and
+   document counts per case (live data) on the detail page.            */
 export default function ComplianceList() {
   const { user } = useAuth()
-  const { t } = useLanguage()
+  const { t }    = useLanguage()
+  const navigate = useNavigate()
   const isAdminOrClerk = user?.role === 'ADMIN' || user?.role === 'CLERK'
+  const isAdmin        = user?.role === 'ADMIN'
 
-  const [records, setRecords]       = useState([])
-  const [filterCase, setFilterCase] = useState('')
-  const [loading, setLoading]       = useState(false)
-  const [err, setErr]               = useState('')
-  const [expanded, setExpanded]     = useState({})
+  const [runs, setRuns]               = useState([])
+  const [loading, setLoading]         = useState(false)
+  const [err, setErr]                 = useState('')
+  const [deletingRunId, setDeletingRunId] = useState(null)
+  const [selected, setSelected]       = useState(new Set())   // run-ids checked
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
-  const loadAll = async () => {
+  const loadRuns = async () => {
     setLoading(true); setErr('')
     try {
-      const p = await compliance.complianceRecordsPaginated(0, 100)
-      setRecords(p?.content || [])
-      setExpanded({})
+      const data = await compliance.runs()
+      setRuns(Array.isArray(data) ? data : [])
     } catch (e) { setErr(e.message) } finally { setLoading(false) }
   }
 
-  const loadByCase = async (e) => {
-    e.preventDefault()
-    if (!filterCase) return
-    setLoading(true); setErr('')
-    try {
-      const data = await compliance.byCase(filterCase) || []
-      setRecords(data)
-      setExpanded({})
-    } catch (e) { setErr(e.message) } finally { setLoading(false) }
-  }
+  useEffect(() => { loadRuns() }, [])
 
-  useEffect(() => { loadAll() }, [])
+  const totals = useMemo(() => {
+    return { runs: runs.length }
+  }, [runs])
 
-  const passCount = records.filter(r => r.result === 'PASS').length
-  const failCount = records.filter(r => r.result === 'FAIL').length
-
-  const caseGroups = useMemo(() => {
-    const groups = {}
-    records.forEach(r => {
-      if (!groups[r.caseId]) groups[r.caseId] = []
-      groups[r.caseId].push(r)
+  const toggleSelected = (runId) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(runId)) next.delete(runId); else next.add(runId)
+      return next
     })
-    return Object.entries(groups).sort((a, b) => Number(a[0]) - Number(b[0]))
-  }, [records])
+  }
+  const toggleAllSelected = () => {
+    if (selected.size === runs.length) setSelected(new Set())
+    else setSelected(new Set(runs.map(r => r.runId)))
+  }
+  const clearSelection = () => setSelected(new Set())
 
-  // undefined = open (default), false = collapsed
-  const isOpen = id => expanded[id] !== false
-  const toggle  = id => setExpanded(prev => ({ ...prev, [id]: !isOpen(id) }))
-  const expandAll   = () => { const e = {}; caseGroups.forEach(([id]) => { e[id] = true });  setExpanded(e) }
-  const collapseAll = () => { const e = {}; caseGroups.forEach(([id]) => { e[id] = false }); setExpanded(e) }
+  const bulkDelete = async () => {
+    if (selected.size === 0) return
+    if (!window.confirm(
+      `Delete ${selected.size} selected compliance check${selected.size !== 1 ? 's' : ''}?\n\n` +
+      `All records produced by the selected runs will be permanently removed.`
+    )) return
+    setBulkDeleting(true); setErr('')
+    try {
+      // Collect every complianceId from the selected runs
+      const allIds = []
+      for (const run of runs) {
+        if (!selected.has(run.runId)) continue
+        try {
+          const recs = await compliance.runRecords(run.runId)
+          ;(recs || []).forEach(r => allIds.push(r.complianceId))
+        } catch { /* skip a run that fails to load — others continue */ }
+      }
+      if (allIds.length > 0) {
+        await compliance.bulkDeleteRecords(allIds)
+      }
+      clearSelection()
+      await loadRuns()
+    } catch (e) {
+      setErr(e.message || 'Bulk delete failed')
+      await loadRuns()
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const goToRun = (run) => {
+    navigate(`/compliance/runs/${encodeURIComponent(run.runId)}`, { state: { run } })
+  }
+
+  const deleteRun = async (run) => {
+    if (!window.confirm(
+      `Delete this compliance check?\n\n` +
+      `It will permanently remove all ${run.checks} record(s) from ${run.cases} case(s).`
+    )) return
+    setDeletingRunId(run.runId); setErr('')
+    try {
+      const recs = await compliance.runRecords(run.runId) || []
+      for (const r of recs) {
+        await compliance.deleteRecord(r.complianceId)
+      }
+      await loadRuns()
+    } catch (e) {
+      setErr(e.message || 'Failed to delete run')
+      await loadRuns()
+    } finally {
+      setDeletingRunId(null)
+    }
+  }
 
   return (
     <div>
-      {/* ── Header ───────────────────────────────────────────────────────────── */}
+      {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
         <div>
-          <h1 className="page-title h3 mb-0">{t('Compliance Records')}</h1>
+          <h1 className="page-title h3 mb-0">{t('Compliance History')}</h1>
           <p className="text-muted small mb-0 mt-1">
-            Records grouped by case &mdash; {caseGroups.length} case{caseGroups.length !== 1 ? 's' : ''}
+            Recent compliance checks. Click an entry to see SLA stages and document counts for each case.
           </p>
         </div>
         {isAdminOrClerk && (
@@ -96,62 +122,29 @@ export default function ComplianceList() {
         )}
       </div>
 
-      {/* ── Summary panel ────────────────────────────────────────────────────── */}
-      {records.length > 0 && (
-        <div className="card shadow-sm border-0 mb-4">
-          <div className="card-body">
-            <div className="row align-items-center g-4">
-              <div className="col-auto text-center">
-                <DonutChart
-                  value={passCount}
-                  max={records.length}
-                  tone={failCount === 0 ? 'success' : records.length > 0 && passCount / records.length >= 0.7 ? 'warning' : 'danger'}
-                />
+      {/* ── KPI strip ───────────────────────────────────────────────────── */}
+      {runs.length > 0 && (
+        <div className="row g-3 mb-4">
+          <div className="col-6 col-md-6">
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-body py-3">
+                <div className="text-muted fw-semibold" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Total Checks
+                </div>
+                <div className="h4 fw-bold mb-0 mt-1">{totals.runs}</div>
               </div>
-              <div className="col">
-                <div className="row g-3">
-                  <div className="col-4">
-                    <div className="p-3 rounded-3 text-center" style={{ background: '#f8f9fa' }}>
-                      <div className="h3 fw-bold mb-0">{records.length}</div>
-                      <div className="text-muted small mt-1">
-                        <i className="bi bi-clipboard-check me-1" />Total Checks
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-4">
-                    <div className="p-3 rounded-3 text-center" style={{ background: '#f0fdf4' }}>
-                      <div className="h3 fw-bold mb-0 text-success">{passCount}</div>
-                      <div className="text-muted small mt-1">
-                        <i className="bi bi-check-circle me-1 text-success" />Passed
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-4">
-                    <div className="p-3 rounded-3 text-center" style={{ background: '#fafafa' }}>
-                      <div className="h3 fw-bold mb-0 text-secondary">{failCount}</div>
-                      <div className="text-muted small mt-1">
-                        <i className="bi bi-exclamation-circle me-1" />Need Review
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-12">
-                    <div className="d-flex justify-content-between text-muted small mb-1">
-                      <span>{caseGroups.length} case{caseGroups.length !== 1 ? 's' : ''} checked</span>
-                      <span>{passCount} / {records.length} checks passed</span>
-                    </div>
-                    <div className="progress" style={{ height: 10, borderRadius: 8 }}>
-                      <div
-                        className="progress-bar bg-success"
-                        style={{ width: `${(passCount / records.length) * 100}%` }}
-                        title={`${passCount} passed`}
-                      />
-                      <div
-                        className="progress-bar"
-                        style={{ width: `${(failCount / records.length) * 100}%`, background: '#dee2e6' }}
-                        title={`${failCount} need review`}
-                      />
-                    </div>
-                  </div>
+            </div>
+          </div>
+          <div className="col-6 col-md-6">
+            <div className="card border-0 shadow-sm h-100">
+              <div className="card-body py-3">
+                <div className="text-muted fw-semibold" style={{ fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Most Recent
+                </div>
+                <div className="h6 fw-bold mb-0 mt-1">
+                  {runs[0]?.runDate
+                    ? formatDateTime(runs[0].runDate)
+                    : runs[0]?.date ? formatDate(runs[0].date) : '—'}
                 </div>
               </div>
             </div>
@@ -159,160 +152,146 @@ export default function ComplianceList() {
         </div>
       )}
 
-      {/* ── Filter bar ───────────────────────────────────────────────────────── */}
+      {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="card shadow-sm border-0 mb-3">
-        <div className="card-body py-2">
-          <form onSubmit={loadByCase} className="d-flex gap-2 align-items-center flex-wrap">
-            <label className="form-label fw-semibold small mb-0">Filter by Case ID:</label>
-            <input
-              className="form-control form-control-sm"
-              style={{ width: 120 }}
-              type="number"
-              placeholder="Case ID"
-              value={filterCase}
-              onChange={e => setFilterCase(e.target.value)}
-            />
-            <button className="btn btn-dark btn-sm" type="submit">Filter</button>
-            <button
-              type="button"
-              className="btn btn-outline-secondary btn-sm"
-              onClick={() => { setFilterCase(''); loadAll() }}
-            >
-              All
-            </button>
-            {caseGroups.length > 1 && (
-              <>
-                <span className="vr mx-1" />
-                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={expandAll}>
-                  <i className="bi bi-arrows-expand me-1" />Expand all
-                </button>
-                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={collapseAll}>
-                  <i className="bi bi-arrows-collapse me-1" />Collapse all
-                </button>
-              </>
-            )}
-          </form>
+        <div className="card-body py-2 d-flex gap-2 align-items-center flex-wrap">
+          <button type="button" className="btn btn-outline-secondary btn-sm" onClick={loadRuns}>
+            <i className="bi bi-arrow-clockwise me-1" />Refresh
+          </button>
+          {isAdmin && selected.size > 0 && (
+            <>
+              <span className="vr mx-1" />
+              <span className="badge text-bg-primary">
+                {selected.size} selected
+              </span>
+              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={clearSelection}>
+                <i className="bi bi-x-lg me-1" />Clear
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm d-flex align-items-center gap-1"
+                disabled={bulkDeleting}
+                onClick={bulkDelete}
+              >
+                {bulkDeleting
+                  ? <><span className="spinner-border spinner-border-sm" />Deleting…</>
+                  : <><i className="bi bi-trash3" />Delete Selected</>}
+              </button>
+            </>
+          )}
+          <span className="text-muted small ms-auto">
+            {runs.length} entr{runs.length !== 1 ? 'ies' : 'y'}
+          </span>
         </div>
       </div>
 
       {err && <div className="alert alert-danger py-2">{err}</div>}
 
-      {/* ── Case groups ──────────────────────────────────────────────────────── */}
-      {loading ? (
-        <div className="text-center text-muted py-5">{t('Loading...')}</div>
-      ) : caseGroups.length === 0 ? (
-        <div className="card shadow-sm border-0">
-          <div className="card-body text-center text-muted py-5">
-            <i className="bi bi-shield display-4 d-block mb-3 opacity-25" />
-            <p className="mb-2">No compliance records found.</p>
-            {isAdminOrClerk && (
-              <Link to="/compliance/check" className="btn btn-primary btn-sm">
-                <i className="bi bi-play-circle me-1" />Run a Compliance Check
-              </Link>
-            )}
-          </div>
+      {/* ── History table ──────────────────────────────────────────────── */}
+      <div className="card shadow-sm border-0">
+        <div className="card-header border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2"
+          style={{ background: 'transparent' }}>
+          <h2 className="h6 mb-0 fw-semibold d-flex align-items-center gap-2">
+            <i className="bi bi-clock-history text-muted" />Recent Compliance Checks
+          </h2>
         </div>
-      ) : (
-        <div className="d-flex flex-column gap-2">
-          {caseGroups.map(([caseId, recs]) => {
-            const casePass = recs.filter(r => r.result === 'PASS').length
-            const caseFail = recs.filter(r => r.result === 'FAIL').length
-            const allPass  = caseFail === 0
-            const open     = isOpen(caseId)
-            const pct      = recs.length > 0 ? Math.round((casePass / recs.length) * 100) : 0
-
-            return (
-              <div key={caseId} className="card shadow-sm border-0">
-                {/* Case header */}
-                <div
-                  className="card-header border-0 d-flex align-items-center justify-content-between gap-2"
-                  style={{ background: 'transparent', cursor: 'pointer', paddingTop: '0.9rem', paddingBottom: '0.9rem' }}
-                  onClick={() => toggle(caseId)}
-                >
-                  <div className="d-flex align-items-center gap-3 flex-wrap">
-                    <div className="d-flex align-items-center gap-2">
-                      <span
-                        className="rounded-circle d-inline-block flex-shrink-0"
-                        style={{ width: 10, height: 10, background: allPass ? '#198754' : '#adb5bd' }}
-                      />
-                      <span className="fw-semibold fs-6">
-                        <Link
-                          to={`/cases/${caseId}`}
-                          className="text-decoration-none"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          Case #{caseId}
-                        </Link>
-                      </span>
-                    </div>
-                    <div className="d-flex align-items-center gap-1 flex-wrap">
-                      <span className="badge rounded-pill text-bg-success">{casePass} Pass</span>
-                      {caseFail > 0 && (
-                        <span className="badge rounded-pill text-bg-secondary">{caseFail} Review</span>
-                      )}
-                      <span className="badge rounded-pill text-bg-light border text-muted">
-                        {recs.length} check{recs.length !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="d-flex align-items-center gap-3 flex-shrink-0">
-                    <div style={{ width: 90 }}>
-                      <div className="progress" style={{ height: 6, borderRadius: 4 }}>
-                        <div className="progress-bar bg-success" style={{ width: `${pct}%` }} />
-                      </div>
-                      <div className="d-flex justify-content-between" style={{ fontSize: '0.68rem' }}>
-                        <span className="text-muted">0%</span>
-                        <span className="fw-semibold text-success">{pct}%</span>
-                      </div>
-                    </div>
-                    <i className={`bi ${open ? 'bi-chevron-up' : 'bi-chevron-down'} text-muted`} />
-                  </div>
-                </div>
-
-                {/* Records sub-table */}
-                {open && (
-                  <div className="border-top">
-                    <div className="table-responsive">
-                      <table className="table table-sm align-middle mb-0" style={{ background: '#fafcff' }}>
-                        <thead style={{ background: '#f1f3f5' }}>
-                          <tr>
-                            <th className="ps-4 text-muted fw-semibold small">ID</th>
-                            <th className="text-muted fw-semibold small">Type</th>
-                            <th className="text-muted fw-semibold small">Result</th>
-                            <th className="text-muted fw-semibold small">Date</th>
-                            <th className="text-muted fw-semibold small">Notes</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {recs.map(r => (
-                            <tr key={r.complianceId}>
-                              <td className="ps-4 text-muted small">#{r.complianceId}</td>
-                              <td>
-                                <span className={`badge rounded-pill ${r.type === 'DOCUMENT' ? 'text-bg-info' : 'text-bg-secondary'}`}>
-                                  <i className={`bi me-1 ${r.type === 'DOCUMENT' ? 'bi-file-earmark-check' : 'bi-diagram-3'}`} />
-                                  {r.type}
-                                </span>
-                              </td>
-                              <td>
-                                <span className={`badge rounded-pill ${statusBadgeClass(r.result)}`}>
-                                  <i className={`bi me-1 ${r.result === 'PASS' ? 'bi-check-circle' : 'bi-exclamation-circle'}`} />
-                                  {r.result}
-                                </span>
-                              </td>
-                              <td className="small text-nowrap text-muted">{formatDate(r.date)}</td>
-                              <td className="small text-muted pe-3" style={{ maxWidth: 300 }}>{r.notes}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+        <div className="card-body p-0">
+          {loading ? (
+            <div className="text-center text-muted py-5">{t('Loading...')}</div>
+          ) : runs.length === 0 ? (
+            <div className="text-center text-muted py-5">
+              <i className="bi bi-shield display-4 d-block mb-3 opacity-25" />
+              <p className="mb-0">No compliance checks yet.</p>
+              <p className="small">Run a compliance check to see entries here.</p>
+              {isAdminOrClerk && (
+                <Link to="/compliance/check" className="btn btn-primary btn-sm mt-2">
+                  <i className="bi bi-play-circle me-1" />Run a Compliance Check
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-hover align-middle mb-0">
+                <thead className="table-light">
+                  <tr>
+                    {isAdmin && (
+                      <th style={{ width: 40 }}>
+                        <input
+                          type="checkbox"
+                          className="form-check-input"
+                          title={selected.size === runs.length ? 'Clear all' : 'Select all'}
+                          checked={runs.length > 0 && selected.size === runs.length}
+                          ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < runs.length }}
+                          onChange={toggleAllSelected}
+                        />
+                      </th>
+                    )}
+                    <th style={{ width: 80 }}>ID</th>
+                    <th>Date &amp; Time</th>
+                    <th>Cases Checked</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.map((run, idx) => {
+                    // ID = sequential number; oldest run is #1, newest run gets the
+                    // highest number. Since `runs` is sorted newest-first, the row
+                    // at index 0 has ID = runs.length.
+                    const id = runs.length - idx
+                    const dateLabel = run.runDate
+                      ? formatDateTime(run.runDate)
+                      : formatDate(run.date)
+                    const isSelected = selected.has(run.runId)
+                    return (
+                      <tr key={run.runId} className={isSelected ? 'table-active' : ''}>
+                        {isAdmin && (
+                          <td>
+                            <input
+                              type="checkbox"
+                              className="form-check-input"
+                              checked={isSelected}
+                              onChange={() => toggleSelected(run.runId)}
+                            />
+                          </td>
+                        )}
+                        <td className="fw-semibold text-primary">#{id}</td>
+                        <td className="small text-nowrap">
+                          <i className="bi bi-calendar3 me-1 text-muted" />
+                          {dateLabel}
+                        </td>
+                        <td>
+                          <span className="badge rounded-pill text-bg-light border text-muted">
+                            <i className="bi bi-folder me-1" />{run.cases} case{run.cases !== 1 ? 's' : ''}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="d-flex gap-1">
+                            <button className="btn btn-outline-primary btn-sm" onClick={() => goToRun(run)}>
+                              <i className="bi bi-eye me-1" />View Details
+                            </button>
+                            {isAdmin && (
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                title="Delete this compliance check"
+                                disabled={deletingRunId === run.runId}
+                                onClick={() => deleteRun(run)}
+                              >
+                                {deletingRunId === run.runId
+                                  ? <span className="spinner-border spinner-border-sm" />
+                                  : <i className="bi bi-trash3" />}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

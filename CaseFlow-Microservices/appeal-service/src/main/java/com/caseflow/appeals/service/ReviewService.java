@@ -92,6 +92,7 @@ public class ReviewService {
             .caseId(appeal.getCaseId())
             .appealId(appealId)
             .judgeId(judgeId)
+            .assignedByClerkId(actorUserId)
             .reviewDate(LocalDateTime.now())
             .build();
         review = reviewRepository.save(review);
@@ -292,6 +293,7 @@ public class ReviewService {
             .caseId(r.getCaseId())
             .appealId(r.getAppealId())
             .judgeId(r.getJudgeId())
+            .assignedByClerkId(r.getAssignedByClerkId())
             .reviewDate(r.getReviewDate())
             .outcome(r.getOutcome())
             .remarks(r.getRemarks())
