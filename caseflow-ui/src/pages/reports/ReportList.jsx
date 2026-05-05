@@ -538,14 +538,18 @@ export default function ReportList() {
 
     if (key === 'appeals') {
       const a = m.appeals || {}
-      const filed     = a.appealsFiled       ?? 0
+      // "Cases Appealed" should mean *total appeals filed* in the scope, not
+      // just appeals currently sitting in the SUBMITTED status. Use totalAppeals
+      // (which JUDGE/CLERK overrides also set to the routed-review count) so
+      // every scope shows a meaningful, non-zero number.
+      const filed     = a.totalAppeals       ?? a.appealsFiled ?? 0
       const assigned  = a.appealsUnderReview ?? 0
       const completed = a.appealsDecided     ?? 0
       // Scope-specific labels for the 3-stat strip
       const reportScope = reportCfg && Object.keys(SCOPE_CONFIG).find(k => SCOPE_CONFIG[k] === reportCfg)
       const labels =
         reportScope === 'JUDGE'
-          ? { a: 'Appeals Assigned to Me', b: 'In Process',         c: 'Reviews Completed' }
+          ? { a: 'Appeals Assigned to Judge', b: 'In Process',         c: 'Reviews Completed' }
         : reportScope === 'CLERK'
           ? { a: 'Appeals I Routed',       b: 'Awaiting Decision',  c: 'Review Completed' }
         : { a: 'Cases Appealed',         b: 'Assigned to Judge',  c: 'Review Completed' }

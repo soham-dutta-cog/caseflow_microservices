@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { appeals, users } from '../../api/services'
+import { appeals, users, hearings as hearingsApi } from '../../api/services'
 import {
   REVIEW_OUTCOME, REVIEW_OUTCOME_LABELS,
   APPEAL_DOC_TYPES, APPEAL_AUDIT_ACTIONS,
@@ -41,6 +41,9 @@ export default function AppealDetail() {
   const [judgeId, setJudgeId] = useState('')
   const [judges, setJudges]   = useState([])
   const [judgesLoading, setJudgesLoading] = useState(false)
+  // judges who already presided over hearings on this case — they CANNOT
+  // be re-assigned to review the appeal (conflict of interest).
+  const [excludedJudgeIds, setExcludedJudgeIds] = useState(new Set())
   const [decision, setDecision] = useState({ outcome: 'APPEAL_UPHELD', remarks: '' })
   const [draftOutcome, setDraftOutcome] = useState('')
   const [uploadForm, setUploadForm] = useState({ title: '', type: 'PETITION', file: null })
@@ -78,6 +81,28 @@ export default function AppealDetail() {
       .catch(() => setJudges([]))
       .finally(() => setJudgesLoading(false))
   }, [])
+
+  // When the appeal loads, fetch the case's hearings and collect every judge
+  // who has presided over the case so we can exclude them from the
+  // appeal-routing dropdown (a judge cannot review their own decision).
+  useEffect(() => {
+    if (!a?.caseId) return
+    let active = true
+    hearingsApi.byCase(a.caseId)
+      .then(list => {
+        if (!active) return
+        const ids = new Set()
+        ;(list || []).forEach(h => {
+          if (h?.judgeId) ids.add(String(h.judgeId))
+        })
+        setExcludedJudgeIds(ids)
+      })
+      .catch(() => { if (active) setExcludedJudgeIds(new Set()) })
+    return () => { active = false }
+  }, [a?.caseId])
+
+  // Filtered list shown in the dropdown (eligible judges only)
+  const eligibleJudges = judges.filter(j => !excludedJudgeIds.has(String(j.userId)))
 
   // ── Action wrappers ────────────────────────────────────────────────────
   const wrap = async (label, fn) => {
@@ -256,8 +281,14 @@ export default function AppealDetail() {
               <div className="appeal-decide-banner">
                 <i className="bi bi-info-circle-fill" />
                 <div>
-                  Assign a judge to start the review. The judge will be validated against IAM and
-                  cannot be reassigned to two active appeals on the same case.
+                  Assign a judge to start the review. Judges who already presided over a hearing
+                  on this case are excluded to avoid a conflict of interest.
+                  {excludedJudgeIds.size > 0 && (
+                    <div className="small text-muted mt-1">
+                      Excluded ({excludedJudgeIds.size}):{' '}
+                      {[...excludedJudgeIds].join(', ')}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="row g-3">
@@ -271,9 +302,13 @@ export default function AppealDetail() {
                     required
                   >
                     <option value="">
-                      {judgesLoading ? 'Loading judges…' : '— Select a judge —'}
+                      {judgesLoading
+                        ? 'Loading judges…'
+                        : eligibleJudges.length === 0
+                          ? '— No eligible judges (all presided over this case) —'
+                          : '— Select a judge —'}
                     </option>
-                    {judges.map(j => (
+                    {eligibleJudges.map(j => (
                       <option key={j.userId} value={j.userId}>
                         {j.name || j.username || j.email || '(unnamed)'} &nbsp;—&nbsp; {j.userId}
                       </option>
