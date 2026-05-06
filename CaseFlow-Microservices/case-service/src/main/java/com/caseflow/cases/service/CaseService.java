@@ -152,7 +152,7 @@ public class CaseService {
                 // Per spec: CASE ACTIVE also notifies CLERKS and JUDGES
                 // (the case is ready for hearing scheduling and judicial review).
                 notifyAllByRole("CLERK", caseId, msg, "CASE");
-                notifyAllByRole("JUDGE", caseId, msg, "CASE");
+//                notifyAllByRole("JUDGE", caseId, msg, "CASE");
 
                 log.info("Case {} activated — advancing workflow", caseId);
                // workflowClient.advanceWorkflow(caseId);
