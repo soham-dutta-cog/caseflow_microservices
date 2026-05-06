@@ -214,9 +214,9 @@ public class ComplianceServiceImpl implements ComplianceService {
         audit.setDate(LocalDate.now());
         Audit saved = auditRepository.save(audit);
         // Notify the closer + all admins so the audit close is visible to oversight.
-        String msg = "Audit #" + auditId + " has been closed. Scope: " + audit.getScope();
-        sendNotification(userId, null, msg);
-        notifyAllAdmins(null, msg);
+//        String msg = "Audit #" + auditId + " has been closed. Scope: " + audit.getScope();
+//        sendNotification(userId, null, msg);
+//        notifyAllAdmins(null, msg);
         return toAuditResponse(saved);
     }
 

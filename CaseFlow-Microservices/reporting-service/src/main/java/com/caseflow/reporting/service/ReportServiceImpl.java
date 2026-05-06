@@ -231,27 +231,37 @@ public class ReportServiceImpl implements ReportService {
         }
 
         // ── 6. Appeals ──────────────────────────────────────────────────────
+        // Strategy: prefer the paginated /api/appeals/paginated endpoint (which
+        // does NOT have per-user role restrictions) over fan-out by case or
+        // /user/{userId} which has @PreAuthorize that rejects CLERK callers.
+        // This makes COURT, PERIOD, CLERK, and LAWYER scopes return data
+        // regardless of who is generating the report.
         List<AppealDto> appeals;
-        if (scope == ReportScope.LAWYER && scopeValue != null && !scopeValue.isBlank()
-                && !"ALL".equalsIgnoreCase(scopeValue)) {
-            // For LAWYER scope, fetch all appeals filed by this user directly. This
-            // covers appeals on cases the lawyer represents AND appeals on cases
-            // they don't (in case the case-by-lawyer mapping uses a different id format).
-            appeals = safeList(() -> appealClient.getAppealsByUser(scopeValue));
-        } else if (narrowing && caseIds.isEmpty()) {
+        if (narrowing && caseIds.isEmpty()) {
             appeals = List.of();
-        } else if (caseIds.isEmpty()) {
-            // System-wide scope: pull a large page
-            PageResponse<AppealDto> pg = appealClient.getAppealsPaginated(0, 1000);
-            appeals = pg != null && pg.getContent() != null ? pg.getContent() : List.of();
         } else {
-            appeals = new ArrayList<>();
-            for (Long caseId : caseIds) {
-                try {
-                    appeals.addAll(appealClient.getAppealsByCase(caseId));
-                } catch (Exception e) {
-                    log.warn("Skipping appeals for case #{}: {}", caseId, e.getMessage());
-                }
+            // Pull all appeals via paginated; we filter client-side after.
+            PageResponse<AppealDto> pg = null;
+            try { pg = appealClient.getAppealsPaginated(0, 5000); }
+            catch (Exception e) { log.warn("Could not fetch paginated appeals: {}", e.getMessage()); }
+            List<AppealDto> all = (pg != null && pg.getContent() != null) ? pg.getContent() : List.of();
+
+            if (scope == ReportScope.LAWYER && scopeValue != null && !scopeValue.isBlank()
+                    && !"ALL".equalsIgnoreCase(scopeValue)) {
+                // LAWYER scope: appeals filed by this user
+                appeals = all.stream()
+                        .filter(a -> scopeValue.equals(a.getFiledByUserId()))
+                        .toList();
+            } else if (!caseIds.isEmpty()) {
+                // COURT / PERIOD / JUDGE / CLERK / CASE / COMPLIANCE: filter to the
+                // resolved case set so we don't include unrelated appeals.
+                java.util.Set<Long> caseIdSet = new java.util.HashSet<>(caseIds);
+                appeals = all.stream()
+                        .filter(a -> a.getCaseId() != null && caseIdSet.contains(a.getCaseId()))
+                        .toList();
+            } else {
+                // No case filter requested → system-wide
+                appeals = all;
             }
         }
         appeals = appeals.stream()
@@ -392,11 +402,14 @@ public class ReportServiceImpl implements ReportService {
         int slaActive       = (int) slaRecords.stream().filter(s -> equalsAny(s.getStatus(), "ACTIVE")).count();
         int slaClosed       = (int) slaRecords.stream().filter(s -> equalsAny(s.getStatus(), "CLOSED", "COMPLETED", "ON_TIME")).count();
 
-        // Appeals
+        // Appeals — must match the actual AppealStatus enum on appeal-service
+        // (SUBMITTED, REVIEWED, DECIDED, CANCELLED). The previous values
+        // ("FILED", "UNDER_REVIEW", "DECISION_ISSUED", "CLOSED") did not match
+        // anything, so COURT / PERIOD / LAWYER / CLERK reports always showed 0.
         int totalAppeals       = appeals.size();
-        int appealsFiled       = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "FILED")).count();
-        int appealsUnderReview = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "UNDER_REVIEW")).count();
-        int appealsDecided     = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "DECISION_ISSUED", "CLOSED")).count();
+        int appealsFiled       = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "SUBMITTED", "FILED")).count();
+        int appealsUnderReview = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "REVIEWED", "UNDER_REVIEW")).count();
+        int appealsDecided     = (int) appeals.stream().filter(a -> equalsAny(a.getStatus(), "DECIDED", "DECISION_ISSUED", "CLOSED")).count();
         // Distinct cases that have at least one appeal — used for the % rate (caps at 100%)
         int casesWithAppeals   = (int) appeals.stream()
                 .map(AppealDto::getCaseId)
